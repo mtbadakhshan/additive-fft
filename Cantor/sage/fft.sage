@@ -17,37 +17,37 @@ def initial_basis_computation(a, dim):
 
 def S_function_computation(dim):
     S = [[]] * (dim)
-    # nz_S: Non zero coeffs indices in S. Note that index 0 is the coefficient of the largest degree
-    nz_S = [[]] * (dim)                   
+    # ns_hdt_S: Non zero coeffs indices in S. Note that index 0 is the coefficient of the highest degree term
+    ns_hdt_S = [[]] * (dim)                   
     for r in range(dim):
         S[r] = [0] * (2**r + 1) ## deg(S_r) = 2^r because 'C(r,r) = 1' 
-        nz_S[r] = []
+        ns_hdt_S[r] = []
         for i in range(r+1): # S_r(t) = \sum_{i=0}^{r} C(r,i)*(t^{2^i}). Therefore, the loop should include i = r
             S[r][2**i] = math.comb(r,i) % 2 # Coefficients are ordered from the constant term up to the highest degree term.
-            if (math.comb(r,i) % 2 == 1): nz_S[r].append(2**i) 
+            if (math.comb(r,i) % 2 == 1): ns_hdt_S[r].append(2**r - 2**i) #Non-zero coefficients indices in S ordered from highest degree term (hdt) 
             
-    return S, nz_S
+    return S, ns_hdt_S
 
-def divide(coeffs, s, nz_s):
+def divide(coeffs, s, ns_hdt_S):
     global n_add
 
     print("coeffs: ", coeffs)
     print("s:      ", s)
-    print("nz_s: ", nz_s)
-    q = [0] * (len(s)-1) # In general case,  deg(q) <= deg(coeffs) - deg(s). 
+    print("ns_hdt_S: ", ns_hdt_S)
+    q = [0] * (len(s)-1) # In general case,  deg(q) = deg(coeffs) - deg(s). 
                          # However, in each round r, deg(coeffs) <= 2^(r+1)-1 and deg(s) = 2^r, hence deg(q) <= 2^r -1 = deg(s) - 1
     for i in range(len(q)):
         if coeffs[~i] == 0: # Coefficients are ordered from the constant term up to the highest degree term. 
                             # Therefore, the last element is the highest degree coefficient. ~i points to the i-th last element in the list
                             # ~ is the bitwise NOT where ~i = -i-1. bitwise NOT is used because its time complexity is O(1)
             continue
-        q[~i] = coeffs[~i]
-        for j in range(0,len(nz_s)-1):
-                coeffs[i + nz_s[j]] += coeffs[~i]; n_add += 1
+        q[~i] = coeffs[~i]  
+        for j in range(0,len(ns_hdt_S)-1): # We ignor the highest degree of S (last element of ns_hdt_S) because in this loop we know it will be canceled with coeffs[i]
+            coeffs[~i - ns_hdt_S[j]] += coeffs[~i]; n_add += 1
             
-        coeffs[i] = 0
+        coeffs[~i] = 0 
 
-    return (q, coeffs[-len(q):])
+    return (q, coeffs[:len(q)])
 
 # def b_n_computation(s, s_eval_x, q, b_0):
 #     m = len(s)
@@ -73,22 +73,22 @@ def fft(f_coeffs, m, a):
     W = initial_basis_computation(a, dim=m)
     print("W: ", W)
 
-    S, nz_S = S_function_computation(dim=m)
+    S, ns_hdt_S = S_function_computation(dim=m)
     # R = m - 1 # number of rounds
     print("S:", S)
-    print("nz_S:", nz_S)
+    print("ns_hdt_S:", ns_hdt_S)
     
-    quit()
     # r = R # r: round indicator
     for r in reversed(range(m)):
         print("r: ", r)
 
-        q, b_0 = divide(copy.deepcopy(f_coeffs), S[r], nz_S[r])
+        q, b_0 = divide(copy.deepcopy(f_coeffs), S[r], ns_hdt_S[r])
         print("q: ", q)
         print("b_0: ", b_0)
         # print("b_1: ", b_1)
         f_coeffs = b_0
 
+    quit()
     print("m:", m)
     print("S[0]:", S[0])
     print("W:", W)
