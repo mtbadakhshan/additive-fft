@@ -28,11 +28,14 @@ def S_function_computation(dim):
             
     return S, ns_hdt_S
 
-def divide(coeffs, s, ns_hdt_S):
+def divide(coeffs, ns_hdt_S, input_size, offset):
+    """
+    input_size (int): It is the number of coefficients in coeffs that we see as the dividend.
+    offset (int): The index in coeffs where the dividend is started
+    """
     global n_add
-
     print("coeffs: ", coeffs)
-    print("s:      ", s)
+    # print("s:      ", s)
     print("ns_hdt_S: ", ns_hdt_S)
     q = [0] * (len(s)-1) # In general case,  deg(q) = deg(coeffs) - deg(s). 
                          # However, in each round r, deg(coeffs) <= 2^(r+1)-1 and deg(s) = 2^r, hence deg(q) <= 2^r -1 = deg(s) - 1
@@ -82,7 +85,7 @@ def fft(f_coeffs, m, a):
     for r in reversed(range(m)):
         print("r: ", r)
 
-        q, b_0 = divide(copy.deepcopy(f_coeffs), S[r], ns_hdt_S[r])
+        q, b_0 = divide(f_coeffs, S[r], ns_hdt_S[r])
         print("q: ", q)
         print("b_0: ", b_0)
         # print("b_1: ", b_1)
