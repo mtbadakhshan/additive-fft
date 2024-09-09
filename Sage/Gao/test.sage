@@ -16,22 +16,19 @@ def test_fft(a, FF):
     N_tests = 1
     direct_eval_time = [0] * N_tests
     gaos_fft_time = [0] * N_tests
-    for iter in range(N_tests):
-        m = 13
-        g_coeffs = [FF.random_element() for i in range(2**randint(0,m))]
-        B = [a**i for i in range(m)]
-        # print("Inputs: g_coeffs = ", g_coeffs)
-        # print("               m = ", m)
-        # print("               B = ", B)
 
-        evaluation_set = [0] * 2**m
-        for i in range(len(evaluation_set)):
-            evaluation_set[i] = an_element_in_basis(B, i)
-        # print("evaluation_set =", evaluation_set)
+    m = 13
+    B = [a**i for i in range(m)]
+    evaluation_set = [0] * 2**m
+    for i in range(len(evaluation_set)):
+        evaluation_set[i] = an_element_in_basis(B, i)
+
+    for iter in range(N_tests):
+        g_coeffs = [FF.random_element() for i in range(2**m)]
+
         start = time()
         evaluated_polynomial = evaluate_polynomial(g_coeffs, evaluation_set)
         direct_eval_time[iter] = time() - start
-        # print(evaluated_polynomial)
 
         start = time()
         fft(g_coeffs, m, B)
