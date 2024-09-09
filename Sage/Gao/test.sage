@@ -17,7 +17,7 @@ def test_fft(a, FF):
     direct_eval_time = [0] * N_tests
     gaos_fft_time = [0] * N_tests
 
-    m = 13
+    m = 12
     B = [a**i for i in range(m)]
     evaluation_set = [0] * 2**m
     for i in range(len(evaluation_set)):
@@ -53,8 +53,8 @@ if __name__ == "__main__":
     # FF.<a> = GF(2**4, modulus= xx**4 + xx + 1)
 
     F.<x> = GF(2)[]
-    irreducible_poly = F.irreducible_element(192)
-    FF.<a> = GF(2**192, modulus=irreducible_poly)
+    irreducible_poly = F.irreducible_element(256)
+    FF.<a> = GF(2**256, modulus=irreducible_poly)
 
     # generate_a_map(a, dim=4)
 

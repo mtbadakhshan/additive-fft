@@ -13,19 +13,16 @@ def initial_basis_computation(a, dim):
         W[i] = b
     return W
 
-# def fast_initial_basis_computation(a, dim):
-#     for b in range(1, 2^dim):
-#         sum = 0
-#         for i in range(dim):
+def fast_initial_basis_computation(a, dim, ext_degree):
+    W = [1] * ext_degree
+    b_m = a
+    while(b_m.trace() != 1):
+        b_m *= a
+    W[-1] = b_m
 
-    
-    W = [1] * dim
-    for i in range(1, dim):
-        b = a
-        while b**2 + b != W[i-1]:
-            b *= a
-        W[i] = b
-    return W
+    for i in reversed(range(1, ext_degree-1)):
+        W[i] = W[i+1]**2 + W[i+1]
+    return W[:dim]
 
 
 def S_function_computation(dim):
@@ -113,9 +110,9 @@ def tail_module(coeffs, nz_hdt_S, input_size, offset, s_shift1, s_shift2):
         coeffs[offset+i+len(q)] = coeffs[offset+i] + q[i] * s_shift2
         coeffs[offset+i] = coeffs[offset+i] + q[i] * s_shift1
     
-def fft_precmp(a, m):
-    W = initial_basis_computation(a, dim=m)
-    S, nz_hdt_S = S_function_computation(dim=m)
+def fft_precmp(a, m, ext_degree):
+    W = fast_initial_basis_computation(a, m, ext_degree)
+    S, nz_hdt_S = S_function_computation(m)
     table = S_shifts_table_generator(S, W)
     return W, S, nz_hdt_S, table
 
@@ -136,11 +133,11 @@ def fft_no_precmp(g_coeffs, m, W, S, nz_hdt_S, table):
         n_modules  <<= 1
         input_size >>= 1
 
-def fft(g_coeffs, m, a):
+def fft(g_coeffs, m, a, ext_degree):
     # global n_add, n_mult
 
     g_coeffs += [0]*(2**(m)-len(g_coeffs))
-    W, S, nz_hdt_S, table = fft_precmp(a, m)
+    W, S, nz_hdt_S, table = fft_precmp(a, m, ext_degree)
     fft_no_precmp(g_coeffs, m, W, S, nz_hdt_S, table)
 
     
