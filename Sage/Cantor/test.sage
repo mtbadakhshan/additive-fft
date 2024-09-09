@@ -11,7 +11,7 @@ def test_fft(a, FF, ext_degree):
     cantors_fft_no_precmp_time = [0] * N_tests
     cantors_fft_with_precmp_time = [0] * N_tests
 
-    m = 12
+    m = 3
     W, S, nz_hdt_S, table = fft_precmp(a, m, ext_degree)
     # print("W:", W)
     evaluation_set = [0] * 2**m
@@ -19,7 +19,8 @@ def test_fft(a, FF, ext_degree):
         evaluation_set[i] = an_element_in_basis(W, i)
     
     for iter in range(N_tests):
-        g_coeffs = [FF.random_element() for i in range(2**m)]
+        # g_coeffs = [FF.random_element() for i in range(2**m)]
+        g_coeffs = [a^4, 1, 0, a^2, a]
         g_coeffs_copy = copy.deepcopy(g_coeffs)
 
         print("Entering Direct Evaluation")
@@ -61,10 +62,27 @@ if __name__ == "__main__":
     # FF.<a> = GF(2**4, modulus= xx**4 + xx + 1)
 
     F.<x> = GF(2)[]
-    ext_degree = 256
+    ext_degree = 4
     irreducible_poly = F.irreducible_element(ext_degree)
     FF.<a> = GF(2**ext_degree, modulus=irreducible_poly)
 
-    # generate_a_map(a, 4)
+    m = 3
+    W, S, nz_hdt_S, _ = fft_precmp(a, m, ext_degree)
+    print("W:", W)
+    table1 = S_shifts_table_generator(S, W)
+    table2 = fast_S_shifts_table_generator(S, W)
+    print("W:", W)
+    print("table1:", table1)
+    print("table2:", table2)
+
+    generate_a_map(a, 4)
     test_fft(a, FF, ext_degree)
     # fast_initial_basis_computation(a, 13)
+
+    # m = 4
+    # W, S, nz_hdt_S, _ = fft_precmp(a, m, ext_degree)
+    # table1 = S_shifts_table_generator(S, W)
+    # table2 = fast_S_shifts_table_generator(S, W)
+    # print("W:", W)
+    # print("table1:", table1)
+    # print("table2:", table2)

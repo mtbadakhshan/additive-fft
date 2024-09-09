@@ -56,7 +56,22 @@ def S_shifts_table_generator(S, W):
     for i in range(len(table)):
         for j in range(len(table[i])):
             table[i][j] = eval_at_x(S[i], table[i][j])
+        table[i] = table[i][::2]
+        table[i] = table[i][1:]
+
     return table
+
+def fast_S_shifts_table_generator(S, W):
+    table = []
+    for r in range(1, len(W)): # r is the row number. The first row is skipped as it only has a head module.
+        row = [0] * ((1<<(r)) - 1)
+        for module in range(1,1<<(r)): # 1<<(r) = 2^r which is the number of modlues in the row r. The first module is skipped as it is a head module.
+            for i in range(r):
+                if module & (1<<i): 
+                    row[module-1] += W[i]
+        table += [row]
+    return table
+
 
 def eval_at_x(s, x):
     result = 0
@@ -93,45 +108,52 @@ def head_module(coeffs, nz_hdt_S, input_size):
     for i in range(len(q)):
         coeffs[i+len(q)] = coeffs[i] + q[i]
 
-def tail_module(coeffs, nz_hdt_S, input_size, offset, s_shift1, s_shift2):
-    # print("tail module::")
-    # print("g_coeffs: ", coeffs)
+def neck_module(coeffs, nz_hdt_S, input_size):
+    offset = input_size
     q = divide(coeffs, nz_hdt_S, input_size, offset)
-    # print("g_coeffs: ", coeffs)
-    # print("s_shift1:", s_shift1)
-    # print("s_shift2:", s_shift2)
     for i in range(len(q)):
-        # print(f"q[{i}]:", q[i])
-        # print(f"q[{i}] * s_shift2:", q[i] * s_shift2)
-        # print(f"coeffs[{offset+i+len(q)}] + q[{i}] * s_shift2:", q[i] * s_shift2)
+        coeffs[offset+i] = coeffs[offset+i] + q[i]
+        coeffs[offset+i+len(q)] = coeffs[offset+i] + q[i] 
 
-        # print(f"q[{i}] * s_shift2:", q[i] * s_shift2)
-        # print(f"coeffs[i] + q[i] * s_shift2:", q[i] * s_shift2)
-        coeffs[offset+i+len(q)] = coeffs[offset+i] + q[i] * s_shift2
+def tail_module(coeffs, nz_hdt_S, input_size, offset, s_shift1):
+    q = divide(coeffs, nz_hdt_S, input_size, offset)
+    for i in range(len(q)):
         coeffs[offset+i] = coeffs[offset+i] + q[i] * s_shift1
+        coeffs[offset+i+len(q)] = coeffs[offset+i] + q[i] 
     
 def fft_precmp(a, m, ext_degree):
-    W = fast_initial_basis_computation(a, m, ext_degree)
+    # W = fast_initial_basis_computation(a, m, ext_degree)
+    W = initial_basis_computation(a, m)
     S, nz_hdt_S = S_function_computation(m)
     table = S_shifts_table_generator(S, W)
     return W, S, nz_hdt_S, table
 
 def fft_no_precmp(g_coeffs, m, W, S, nz_hdt_S, table):
+    g_coeffs += [0]*(2**(m)-len(g_coeffs))
     input_size = len(g_coeffs)
     n_modules = 1
-    for r in range(m):
+    print("g_coeffs: ", g_coeffs)
+
+    head_module(g_coeffs, nz_hdt_S[0], input_size)
+    print("g_coeffs (after head): ", g_coeffs)
+
+    for r in range(1,m):
+        input_size >>= 1
+        n_modules  <<= 1
         # print("r: ", r)
         # print("g_coeffs: ", g_coeffs)
         head_module(g_coeffs, nz_hdt_S[r], input_size)
-        # print("g_coeffs (after head): ", g_coeffs)
+        print("g_coeffs (after head): ", g_coeffs)
+        # neck_module(g_coeffs, nz_hdt_S[r], input_size)
+        # print("g_coeffs (after neck): ", g_coeffs)
         offset = 0
-        for i in range(1, n_modules):
+        for i in range(0, n_modules-1):
             offset += input_size
-            tail_module(g_coeffs, nz_hdt_S[r], input_size, offset, table[r][2*i], table[r][2*i+1])
-            # print("g_coeffs (after tail): ", g_coeffs)
+            tail_module(g_coeffs, nz_hdt_S[r], input_size, offset, table[r][i])
+            print("g_coeffs (after tail): ", g_coeffs)
 
-        n_modules  <<= 1
-        input_size >>= 1
+        
+        
 
 def fft(g_coeffs, m, a, ext_degree):
     # global n_add, n_mult
