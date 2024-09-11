@@ -6,7 +6,7 @@ load('fft.sage')
 load('../utils/utils.sage')
 
 def test_fft(a, FF, ext_degree):
-    N_tests = 1
+    N_tests = 10
     DIRECT_EVAUATION_TEST = True
     
     direct_eval_time = [0] * N_tests

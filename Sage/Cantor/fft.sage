@@ -78,7 +78,7 @@ def fft_precmp(a, m, ext_degree):
 
     """
     W = fast_initial_basis_computation(a, m, ext_degree)
-    nz_hdt_S = S_function_computation(m)
+    nz_hdt_S = S_function_computation_2(m)
     table = fast_S_shifts_table_generator(W)
     return W, nz_hdt_S, table
 
@@ -132,53 +132,114 @@ def fast_initial_basis_computation(a, m, ext_degree):
 
 def S_function_computation(m):
     """
-    Computes s_r(x) polynomials for each round. 
-     
+    Computes the s_r(x) polynomials for each round r where 0 <= r < m.
+
     Parameters: 
-    a (element of GF(2^ext_degree)): The primitive element of the finite field GF(2^ext_degree). It is the root of the 
-                                     irreducible polynomial that defines the field.
-    m (int): deg(g(x)) < 2^m. This determines the size of the FFT and the number of rounds.
-    ext_degree (int): The extension degree of the field GF(2), such that the field is GF(2^ext_degree). In Cantor's algorithm, 
-                      ext_degree must be a power of two to compute Canto's basis.
+    m (int): Determines the number of rounds (r), where r ranges from 0 to m-1.
 
     Returns: 
-    W (list): Cantor's basis, which defines the set of points where the polynomial will be evaluated. 
+    nz_hdt_S (list[list]): A list of lists where each inner list contains the indices of the non-zero coefficients 
+                           in the polynomial s_r(x) for each round r, ordered from the highest degree term (hdt) to the lowest.
     """
-    S = [[]] * (m)
+    # nz_hdt_S: Non zero coeffs indices in S ordered from the highest degree term (hdt) to the lowest.
+    # Hence, for example  0 corresponds to the highest degree term in s_r(x).
+    nz_hdt_S = [[]] * (m)                   
+    for r in range(m):
+        # S[r] = [0] * (2**r + 1) # deg(S_r) = 2^r because 'C(r,r) = 1' 
+        nz_hdt_S[r] = []
+        for i in range(r+1): # S_r(t) = \sum_{i=0}^{r} C(r,i)*(t^{2^i}). Therefore, the loop should include i = r
+            # S[r][2**i] = math.comb(r,i) % 2 # Coefficients are ordered from the constant term up to the highest degree term.
+            if (math.comb(r,i) % 2): nz_hdt_S[r].append((1<<r) - (1<<i)) # Non-zero coefficients indices in S ordered from highest degree term (hdt)       
+    nz_hdt_S.reverse()  # Reverse the list because the FFT algorithm processes the polynomials starting from S_{m-1} 
+                        # down to S_0.
+    # S.reverse()
+    return nz_hdt_S
+
+def S_function_computation_2(m):
+    """
+    Computes the s_r(x) polynomials for each round r where 0 <= r < m. This implementation avoids the use of math.comb 
+    and instead utilizes bitwise operations to determine the parity of binomial coefficients C(r, i).
+    
+    In Sage, this implementation does not show improved performance compared to the original `S_function_computation` 
+    because math.comb is implemented in C, which makes it highly efficient. However, in C++ we expect this implementation 
+    to offer better performance due to the efficiency of bitwise operations.
+
+    Parameters: 
+    m (int): Determines the number of rounds (r), where r ranges from 0 to m-1.
+
+    Returns: 
+    nz_hdt_S (list[list]): A list of lists where each inner list contains the indices of the non-zero coefficients 
+                           in the polynomial s_r(x) for each round r, ordered from the highest degree term (hdt) to the lowest.
+    """
     # nz_hdt_S: Non zero coeffs indices in S. Note that index 0 is the coefficient of the highest degree term in s_r(x),
     nz_hdt_S = [[]] * (m)                   
     for r in range(m):
-        S[r] = [0] * (2**r + 1) # deg(S_r) = 2^r because 'C(r,r) = 1' 
+        nz_hdt_S[r] = [(1<<r)-1]
+        for i in range(1,r): # S_r(t) = \sum_{i=0}^{r} C(r,i)*(t^{2^i}). 
+                             # C(r,0) = 1, so we assigned that before loop.
+                             # Also, C(r,r) = 1, so we will append that after loop.
+            is_odd = (r & True) or (not(i & True))
+            ii = i >> 1
+            rr = r >> 1
+            while(is_odd and ii>0):
+                is_odd = (rr & True) or (not(ii & True))
+                rr >>= 1
+                ii >>= 1
+            if (is_odd): nz_hdt_S[r].append((1<<r) - (1<<i)) # Non-zero coefficients indices in S ordered from highest degree term (hdt)       
+        nz_hdt_S[r].append(0)
+    nz_hdt_S.reverse()
+    return nz_hdt_S
+
+def S_function_computation_3(m):
+    """
+    Computes the s_r(x) polynomials for each round r where 0 <= r < m using the recursive relation:
+    S_{r+1}(x) = S(S_r(x)) = S_r^2(x) + S_r(x).
+
+    Parameters: 
+    m (int): Determines the number of rounds (r), where r ranges from 0 to m-1.
+
+    Returns: 
+    nz_hdt_S (list[list]): A list of lists where each inner list contains the indices of the non-zero coefficients 
+                           in the polynomial s_r(x) for each round r, ordered from the highest degree term (hdt) to the lowest.
+    """
+    S = [[]] * (m)
+    nz_S = [[]] * (m) 
+    nz_hdt_S = [[]] * (m) 
+    S[0] = [0,1] # S_0 = x
+    nz_S[0] = [1]
+    nz_hdt_S[0] = [0]
+    for r in range(1,m):
+        S[r] = ([0] * ((1<<(r)) + 1)) # deg(S_r) = 2^r hence it has at most 2^r + 1 coefficients
         nz_hdt_S[r] = []
-        for i in range(r+1): # S_r(t) = \sum_{i=0}^{r} C(r,i)*(t^{2^i}). Therefore, the loop should include i = r
-            S[r][2**i] = math.comb(r,i) % 2 # Coefficients are ordered from the constant term up to the highest degree term.
-            if (S[r][2**i] == 1): nz_hdt_S[r].append(2**r - 2**i) # Non-zero coefficients indices in S ordered from highest degree term (hdt)       
+        nz_S[r] = []
+        for i in nz_S[r-1]:
+            S[r][2*i] = S[r-1][i] 
+            S[r][i] ^^= S[r-1][i] 
+
+        for i in range((1<<r)+1):
+            if (S[r][i] == 1): 
+                nz_hdt_S[r].append((1<<r) - i)
+                nz_S[r].append(i)
+
     nz_hdt_S.reverse()
     S.reverse()
     return nz_hdt_S
-
-def fast_S_function_computation(m):
-    # Todo: Implement S function computation using the fact that S_{m+1}(x) = S(S_m(x)) = S_m^2(x) + S_m(x) 
-    # S = [[]] * (m)
-    # nz_hdt_S = [[]] * (m) 
-    # S[0] = [0,1] # S_0 = x
-    # # S[1] = [0,0,1]  
-    # for r in range(1,m):
-    #     S[r] = ([0] * (1<<(r) + 1)) # deg(S_r) = 2^r hence it has at most 2^r + 1 coefficients
-    #     # print(f"S[{r}] = {S[r]}")
-    #     for i in range(1<<(r-1) + 1):
-    #         S[r][2*i] = S[r-1][i] 
-    #         S[r][i] += S[r-1][i] 
-    #         # print(i, f"S[{r}] = {S[r]}")
-    #     for i in range((1<<r)+1):
-    #         if (S[r][i] == 1): nz_hdt_S[r].append((1<<r) - i)
-    # nz_hdt_S.reverse()
-    # S.reverse()
-    # return nz_hdt_S
-    pass
+    
         
-
 def S_shifts_table_generator(S, W):
+    """
+    Computes the shift values required for the tail_module function. In each branch of each round, 
+    the tail_module function requires the value of S_r(y_p + y_q), where y_p and y_q are either one of the basis elements in W
+    or are zero. This function pre-computes all the non-zero values by evaluating them in the S_r polynomial.
+ 
+    Parameters: 
+    S (list[list]): A list of lists, where each sublist contains the coefficients of the polynomial S_r for round r.
+    W (list): A list of basis elements.
+
+    Returns: 
+    table (list[list]): A list of lists, where each inner list contains the precomputed shift values for the tail_module function 
+                        for each branch in each round.
+    """
     table = []
     for i in range(len(W)):
         row = []
@@ -188,31 +249,59 @@ def S_shifts_table_generator(S, W):
             else:
                 shift = table[-1][j>>1]
             if j % 2:
-                shift += W[~i]         #~i points to the i-th last element in the list:  ~ is the bitwise NOT where ~i = -i-1. bitwise NOT is used because its time complexity is O(1)
+                shift += W[~i]          # ~i points to the i-th last element in the list:  ~ is the bitwise NOT 
+                                        #where ~i = -i-1. bitwise NOT is used because its time complexity is O(1)
             row += [shift]
-            # print(f"eval_at_x(S[{i}], {shift}) = ", eval_at_x(S[i], shift))
         table += [row]    
     for i in range(len(table)):
         for j in range(len(table[i])):
-            table[i][j] = eval_at_x(S[i], table[i][j])
+            table[i][j] = eval_s_at_x(S[i], table[i][j])
         table[i] = table[i][::2]
         table[i] = table[i][1:]
 
     return table
 
 def fast_S_shifts_table_generator(W):
+    """
+    Computes the shift values required for the tail_module function. In each branch of each round, 
+    the tail_module function requires the value of S_r(y_p + y_q), where y_p and y_q are either one of the basis elements in W
+    or are zero. This function optimizes the computation by not explicitly evaluating y_p and y_q in the S_r polynomials.
+    Instead, it uses the fact that S_r(y_{r+k}) = y_k, where y_k in W.
+ 
+    Parameters: 
+    S (list[list]): A list of lists, where each sublist contains the coefficients of the polynomial S_r for round r.
+    W (list): A list of basis elements.
+
+    Returns: 
+    table (list[list]): A list of lists, where each inner list contains the precomputed shift values for the tail_module function 
+                        for each branch in each round.
+    """
     table = []
     for r in range(0, len(W)): # r is the row number. The first row is skipped as it only has a head module.
-        row = [0] * ((1<<(r)) - 1)
-        for module in range(1<<(r)): # 1<<(r) = 2^r which is the number of modlues in the row r. The first module is skipped as it is a head module.
+        row = [0] * ((1<<(r)) - 1)  # 1<<(r) = 2^r which is the number of modlues in the row r. 
+                                    # The first module is skipped as it is a head module.     
+        for module in range(1, 1<<(r)): 
             for i in range(r):
-                if module & (1<<i): 
+                if module & (1<<i): # if the i-th bit in the r-bit module number is set, add W[i+1] to the shift value.
                     row[module-1] += W[i+1]
         table += [row]
     return table
 
 
-def eval_at_x(s, x):
+def eval_s_at_x(s, x):
+    """
+    Evaluates the polynomial s at a given point x in GF(2^ext_degree), where the coefficients of s are in GF(2).
+    
+    Parameters:
+    s (list):  A list of coefficients for the polynomial s, where each coefficient is in GF(2). 
+               The i-th element of the list corresponds to the coefficient of x^i.
+    x (element of GF(2^ext_degree)): The point at which the polynomial is evaluated. 
+                                     It is an element of the finite field GF(2^ext_degree).
+
+    Returns:
+    result (element of GF(2^ext_degree)): The result of the evaluation, i.e., s(x). 
+                                          This is the value of the polynomial at the point x.
+    """
     result = 0
     for i in range(len(s)):
         result += s[i] * (x ** i)
@@ -254,11 +343,35 @@ def divide(coeffs, nz_hdt_S, input_size, offset):
     return (q)
 
 def head_module(coeffs, nz_hdt_S, input_size):
+    """
+    The head_module is the first module in each row. It computes on the first input_size coefficients of coeffs.
+
+    Parameters:
+    coeffs (list):  A list of coefficients representing the polynomial g(x) at the current round
+    nz_hdt_S (list): A list of indices representing the non-zero terms of the polynomial s_r(x), ordered from the highest degree term to the lowest. 
+                     This list is used as input to the modules (both head or tail) in round r
+    input_size (int): The number of coefficients in coeffs that are provided as input to this module.
+
+    * This module modifies coeffs in place.
+    """
     q = divide(coeffs, nz_hdt_S, input_size, offset=0)
     for i in range(len(q)):
         coeffs[i+len(q)] = coeffs[i] + q[i]
 
 def tail_module(coeffs, nz_hdt_S, input_size, offset, s_shift1):
+    """
+    The tail_module is used as modules after the head_module in each row. It operations on a subset of coefficients, starting from a given offset.
+
+    Parameters:
+    coeffs (list):  A list of coefficients representing the polynomial g(x) at the current round
+    nz_hdt_S (list): A list of indices representing the non-zero terms of the polynomial s_r(x), ordered from the highest degree term to the lowest. 
+                     This list is used as input to the head module in round r
+    input_size (int): The number of coefficients in coeffs that are provided as input to this module.
+    offset (int): The starting index from which this module operates within coeffs
+    s_shift1 (int): A shift factor applied to the result of the division
+
+    * This module modifies coeffs in place.
+    """
     q = divide(coeffs, nz_hdt_S, input_size, offset)
     for i in range(len(q)):
         coeffs[offset+i] = coeffs[offset+i] + q[i] * s_shift1

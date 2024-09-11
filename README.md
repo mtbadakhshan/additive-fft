@@ -6,6 +6,7 @@ Additive Fast Fourier Transforms over Finite Fields
 1. Implement the IFFT algorithm for Gao's algorithm in Sage 
 1. Write comments on the code
 1. Gao's FFT excluding the pre-computations
+1. Implementation of Gao's algorithm for the affine space
 
 ### Done:
  1. Make `S_shifts_table_generator` function faster in the pre computations in the Cantor's algorithm using the fact that $S_{i+k}(y_k) = y_i$.
