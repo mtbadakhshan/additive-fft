@@ -1,3 +1,19 @@
+def span_basis(B):
+    subset = [0] * 2**len(B)
+    for i in range(len(subset)):
+        subset[i] = an_element_in_basis(B, i)
+    return subset
+
+def polynomial_to_string(coeffs):
+    string = f"{coeffs[0]}"
+    for i, c in enumerate(coeffs[1:]):
+        if c:
+            if c==1:
+                string += f" + x^{i}"
+            else:
+                string += f" + ({c})x^{i}"
+    return string
+
 def evaluate_polynomial(coeffs, eval_set):
     """
     Evaluates the polynomial represented by coeffs at each point in the evaluation set eval_set.

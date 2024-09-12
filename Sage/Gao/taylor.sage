@@ -1,24 +1,31 @@
 
-def taylor_expansion(coeffs):
-    R = math.ceil(math.log(len(coeffs), 2)) - 1            # R: Number of the rounds
-    # coeffs.extend([0]*(2**(R + 1)-len(coeffs)))
-    coeffs[:0] = [0]*(2**(R + 1)-len(coeffs))
-    # print("> zero padded:  coeffs =",coeffs)
-    # print("> Number of rounds:  R =",R)
+load('../utils/utils.sage')
 
-    r = 0   # r: round counter 
-    for r in range(R):
-        # print("> r =", r)
-        input_size = len(coeffs) / (2**r)
-        for b in range(2**r): 
-            taylor_module(coeffs, input_size, b) 
-        # print(">> coeffs =", coeffs)
-
-    return (coeffs[0::2] + coeffs[1::2]) # Concats g_0 and g_1
+def taylor_expansion(coeffs, input_len):
+    """
+    Since, in the last part of the Taylor expansion, we need to arranges the even-indexed elements first, 
+    followed by the odd-indexed elements. Hence, we have to copy
+    """
+    input_size = input_len
+    r = 0
+    while input_size >> 2:
+        offset = 0
+        for _ in range(1<<r): 
+            taylor_module(coeffs, input_size, offset) 
+            offset +=input_size
+        r += 1
+        input_size >>= 1
+    # print("g_0(x) = ", polynomial_to_string(coeffs[0::2]))
+    # print("g_1(x) = ", polynomial_to_string(coeffs[1::2]))
+    coeffs[:] = coeffs[0::2] + coeffs[1::2] # Concats g_0 and g_1
+    return (coeffs) 
     
 
-def taylor_module(coeffs, input_size, b):
-    chunk_size = input_size / 4     # Divides the vector of coeffs into four chunks
+def taylor_module(coeffs, input_size, offset):
+    chunk_size = input_size >> 2     # Divides the vector of coeffs into four chunks
+    offset1 = offset  + chunk_size
+    offset2 = offset1 + chunk_size
+    offset3 = offset2 + chunk_size
     for i in range(chunk_size):
-        coeffs[ b * input_size + 2 * chunk_size + i ] += coeffs[ b * input_size + 3 * chunk_size + i ]
-        coeffs[ b * input_size + 1 * chunk_size + i ] += coeffs[ b * input_size + 2 * chunk_size + i ]
+        coeffs[ offset2 + i ] += coeffs[ offset3 + i ]
+        coeffs[ offset1 + i ] += coeffs[ offset2 + i ]
