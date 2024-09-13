@@ -78,7 +78,7 @@ def scale_polynomial_by_beta(coeffs, input_size, beta):
         for j in range(input_size):
             coeffs[i+j] = beta_p * coeffs[i+j]
             beta_p *= beta
-    return coeffs
+    # return coeffs
 
 
 def fft_f(coeffs, m, B):
@@ -96,17 +96,48 @@ def fft_f(coeffs, m, B):
     """
     input_size = len(coeffs)
     for r in range(m-1):
-        coeffs = scale_polynomial_by_beta(coeffs, input_size, B[r][-1])  # B[i][-1] := beta_m
+        scale_polynomial_by_beta(coeffs, input_size, B[r][-1])  # B[i][-1] := beta_m
         offset = 0
         for b in range(1<<r):
             coeffs[offset:offset+input_size] = taylor_expansion(coeffs[offset:offset+input_size], input_size)
             offset+=input_size
+        input_size >>= 1
+    assert(input_size == 2)
+    assert(len(B[-1]) == 1)
+    for i in range(0, len(coeffs), 2):
+        coeffs[i:i+2] = evaluate_polynomial(coeffs[i:i+2], [0] + B[-1])
+
+def fft_f_2(coeffs, m, B):
+    """
+    Forward process in the FFT algorithm.
+
+    Parameters:
+    coeffs (list): The list of coefficients of the input polynomial, ordered from the constant term up to the highest degree term.
+    m (int): The upper bound of the degree of the input polynomial, such that the degree is less than 2^m.
+    B (list of lists): The list of precomputed bases for all rounds. The basis for the first round corresponds to the evaluation set,
+              and for later rounds, it is equal to the D basis computed in the G_D_computation function.
+
+    Returns:
+    list: The result of the forward FFT process applied to the input polynomial coefficients.
+    """
+    input_size = len(coeffs)
+
+    for r in range(m-1):
+        scale_polynomial_by_beta(coeffs, input_size, B[r][-1])  # B[i][-1] := beta_m
+        offset = 0
+        for b in range(1<<r):
+            taylor_expansion_no_post_cmp(coeffs, input_size, offset)
+            offset+=input_size
+        g_0_g_1_extraction(coeffs, input_size, 1<<r)
+
 
         input_size >>= 1
     assert(input_size == 2)
     assert(len(B[-1]) == 1)
     for i in range(0, len(coeffs), 2):
         coeffs[i:i+2] = evaluate_polynomial(coeffs[i:i+2], [0] + B[-1])
+
+
 
 
 def fft_r_l1(coeffs, m, G):

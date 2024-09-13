@@ -11,14 +11,14 @@ def test_taylor(a):
     print(f"output = {output}")
 
 def test_fft(a, FF):
-    N_tests = 1
+    N_tests = 10
     DIRECT_EVAUATION_TEST = True
     direct_eval_time = [0] * N_tests
     gaos_fft_with_precmp_time = [0] * N_tests
     gaos_fft_no_precmp_time_lvl1 = [0] * N_tests
     gaos_fft_no_precmp_time_lvl2 = [0] * N_tests
 
-    m = 10
+    m = 11
     B = [a**i for i in range(m)]
     if(DIRECT_EVAUATION_TEST):
         evaluation_set = span_basis(B)

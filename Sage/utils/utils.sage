@@ -9,9 +9,9 @@ def polynomial_to_string(coeffs):
     for i, c in enumerate(coeffs[1:]):
         if c:
             if c==1:
-                string += f" + x^{i}"
+                string += f" + x^{i+1}"
             else:
-                string += f" + ({c})x^{i}"
+                string += f" + ({c})x^{i+1}"
     return string
 
 def evaluate_polynomial(coeffs, eval_set):
