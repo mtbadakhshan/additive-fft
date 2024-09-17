@@ -82,53 +82,7 @@ def fft_precmp(a, m, ext_degree):
     table = fast_S_shifts_table_generator(W)
     return W, nz_hdt_S, table
 
-def initial_basis_computation(a, m):
-    """
-    Computes Cantor's basis non-optimally. The algorithm initializes W[0] = 1 and derives each subsequent W[i], such that 
-    W[i]^2 + W[i] = W[i-1] for i >= 1. It performs a search in the field GF(2^ext_degree) to find each W[i]. 
-    This is a brute-force approach and not an efficient method.
-    
-    Parameters: 
-    a (element of GF(2^ext_degree)): The primitive element of the finite field GF(2^ext_degree). It is the root of the 
-                                     irreducible polynomial that defines the field.
-    m (int): deg(g(x)) < 2^m. This determines the size of the FFT and the number of rounds.
-    
-    Returns: 
-    W (list): Cantor's basis, which defines the set of points where the polynomial will be evaluated. 
-    """
-    W = [1] * m
-    for i in range(1, m):
-        b = a
-        while b**2 + b != W[i-1]:
-            b *= a
-        W[i] = b
-    return W
 
-def fast_initial_basis_computation(a, m, ext_degree):
-    """
-    Computes Cantor's basis optimally using the trace function over GF(2^ext_degree). The algorithm first searches for W[m-1] 
-    such that tr(W[m-1]) = 1, where tr() is the trace function. Once W[m-1] is found, the algorithm recursively determines 
-    W[i-1] for each i, such that W[i]^2 + W[i] = W[i-1].
-     
-    Parameters: 
-    a (element of GF(2^ext_degree)): The primitive element of the finite field GF(2^ext_degree). It is the root of the 
-                                     irreducible polynomial that defines the field.
-    m (int): deg(g(x)) < 2^m. This determines the size of the FFT and the number of rounds.
-    ext_degree (int): The extension degree of the field GF(2), such that the field is GF(2^ext_degree). In Cantor's algorithm, 
-                      ext_degree must be a power of two to compute Canto's basis.
-
-    Returns: 
-    W (list): Cantor's basis, which defines the set of points where the polynomial will be evaluated. 
-    """
-    W = [1] * ext_degree
-    b_m = a
-    while(b_m.trace() != 1):
-        b_m *= a
-    W[-1] = b_m
-
-    for i in reversed(range(1, ext_degree-1)):
-        W[i] = W[i+1]**2 + W[i+1]
-    return W[:m]
 
 def S_function_computation(m):
     """

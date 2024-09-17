@@ -2,6 +2,8 @@
 Additive Fast Fourier Transforms over Finite Fields
 
 ## To-do:
+1. Implement Gao's general algorithm using Cantor's basis.
+1. Implement Gao's special case algorithm
 1. Implement the IFFT algorithm for Cantor's algorithm in Sage
 1. Implement the IFFT algorithm for Gao's algorithm in Sage 
 1. Design Gao's and Cantor's algorithms for the affine space

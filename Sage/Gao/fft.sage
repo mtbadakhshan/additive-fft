@@ -1,7 +1,10 @@
 load('taylor.sage')
 load('../utils/utils.sage')
 
-def fft(g_coeffs, m, B):
+GENERAL_BASIS = 0
+CANTOR_BASIS = 1
+
+def gm_fft(g_coeffs, m, B, mode=GENERAL_BASIS):
     """
     Computes the Fast Fourier Transform (FFT) of the polynomial g(x) using Gao's algorithm.
 
@@ -14,32 +17,41 @@ def fft(g_coeffs, m, B):
     list: The FFT of the polynomial g(x) evaluated at the points in B.
     """
     g_coeffs += [0]*(2**(m)-len(g_coeffs))
-    B, G, D = fft_precmp_l1(m, B)
+    
+    if mode == GENERAL_BASIS:
+        G, D = gm_fft_precmp_l1(m, B, mode)
+        gm_fft_f_2(g_coeffs, m, [B] + D)
+        gm_fft_r_l1(g_coeffs, m, G)
 
-    fft_f(g_coeffs, m, [B] + D)
-    fft_r_l1(g_coeffs, m, G)
-
-def fft_no_precmp_lvl1(g_coeffs, m, B, G, D):
-    fft_f(g_coeffs, m, [B] + D)
-    fft_r_l1(g_coeffs, m, G)
-
-def fft_no_precmp_lvl2(g_coeffs, m, B, G_set, D):
-    fft_f(g_coeffs, m, [B] + D)
-    fft_r_l2(g_coeffs, m, G_set)
+    if mode == CANTOR_BASIS:
+        gm_fft_f_2(g_coeffs, m, None, CANTOR_BASIS)
+        B_set = span_basis(B)
+        gm_fft_r_l2(g_coeffs, m, B_set, CANTOR_BASIS)
 
 
-def fft_precmp_l1(m, B):
+
+
+def gm_fft_no_precmp_lvl1(g_coeffs, m, B, G, D):
+    gm_fft_f_2(g_coeffs, m, [B] + D)
+    gm_fft_r_l1(g_coeffs, m, G)
+
+def gm_fft_no_precmp_lvl2(g_coeffs, m, B, G_set, D):
+    gm_fft_f_2(g_coeffs, m, [B] + D)
+    gm_fft_r_l2(g_coeffs, m, G_set)
+
+
+def gm_fft_precmp_l1(m, B, mode = GENERAL_BASIS):
     G = [[]] * (m-1); D = [[]] * (m-1)
     G[0], D[0] = G_D_computation(B)
     for i in range(1,m-1):
         G[i], D[i] = G_D_computation(D[i-1])
-    return B, G, D
+    return G, D
 
-def fft_precmp_l2(m, B):
-    B, G, D = fft_precmp_l1(m, B)
+def gm_fft_precmp_l2(m, B):
+    G, D = gm_fft_precmp_l1(m, B)
     for i in range(0, m-1):
         G[i] = span_basis(G[i])
-    return B, G, D
+    return G, D
 
 
 def G_D_computation(B):
@@ -54,12 +66,21 @@ def G_D_computation(B):
         - G (list): The computed G basis, where each element is derived from B.
         - D (list): The computed D basis, where each element is calculated as the square of G[i]^2 - G[i].
     """
-    G = [0] * (len(B)-1)
-    D = [0] * len(G)
-    for i in range(len(G)):
-        G[i] = B[i] * (B[-1] ** (-1))
-        D[i] = (G[i] ** 2) - G[i]
+    
+    D = [0] * (len(B)-1)
+    if (B[-1] != 1):
+        G = [0] * len(D)
+        for i in range(len(G)):
+            G[i] = B[i] * (B[-1] ** (-1))  
+            D[i] = (G[i] ** 2) - G[i]
+    else: 
+        G = B[:-1]
+        for i in range(len(G)):    
+            D[i] = (G[i] ** 2) - G[i]
+
+
     return G, D
+
 
 def scale_polynomial_by_beta(coeffs, input_size, beta):
     """
@@ -81,7 +102,7 @@ def scale_polynomial_by_beta(coeffs, input_size, beta):
     # return coeffs
 
 
-def fft_f(coeffs, m, B):
+def gm_fft_f(coeffs, m, B=None, mode=GENERAL_BASIS):
     """
     Forward process in the FFT algorithm.
 
@@ -95,19 +116,25 @@ def fft_f(coeffs, m, B):
     list: The result of the forward FFT process applied to the input polynomial coefficients.
     """
     input_size = len(coeffs)
+
     for r in range(m-1):
-        scale_polynomial_by_beta(coeffs, input_size, B[r][-1])  # B[i][-1] := beta_m
+        if mode == GENERAL_BASIS:
+            scale_polynomial_by_beta(coeffs, input_size, B[r][-1])  # B[i][-1] := beta_m
         offset = 0
         for b in range(1<<r):
             coeffs[offset:offset+input_size] = taylor_expansion(coeffs[offset:offset+input_size], input_size)
             offset+=input_size
         input_size >>= 1
-    assert(input_size == 2)
-    assert(len(B[-1]) == 1)
-    for i in range(0, len(coeffs), 2):
-        coeffs[i:i+2] = evaluate_polynomial(coeffs[i:i+2], [0] + B[-1])
 
-def fft_f_2(coeffs, m, B):
+    if mode == GENERAL_BASIS:
+        for i in range(0, len(coeffs), 2):
+            coeffs[i+1] = coeffs[i] + coeffs[i+1]*B[-1][0]
+    else:
+        for i in range(0, len(coeffs), 2):
+            coeffs[i+1] += coeffs[i] 
+
+
+def gm_fft_f_2(coeffs, m, B=None, mode=GENERAL_BASIS):
     """
     Forward process in the FFT algorithm.
 
@@ -123,24 +150,27 @@ def fft_f_2(coeffs, m, B):
     input_size = len(coeffs)
 
     for r in range(m-1):
-        scale_polynomial_by_beta(coeffs, input_size, B[r][-1])  # B[i][-1] := beta_m
+        if mode == GENERAL_BASIS:
+            scale_polynomial_by_beta(coeffs, input_size, B[r][-1])  # B[i][-1] := beta_m
         offset = 0
         for b in range(1<<r):
             taylor_expansion_no_post_cmp(coeffs, input_size, offset)
             offset+=input_size
         g_0_g_1_extraction(coeffs, input_size, 1<<r)
-
-
         input_size >>= 1
-    assert(input_size == 2)
-    assert(len(B[-1]) == 1)
-    for i in range(0, len(coeffs), 2):
-        coeffs[i:i+2] = evaluate_polynomial(coeffs[i:i+2], [0] + B[-1])
+
+
+    if mode == GENERAL_BASIS:
+        for i in range(0, len(coeffs), 2):
+            coeffs[i+1] = coeffs[i] + coeffs[i+1]*B[-1][0]
+    else:
+        for i in range(0, len(coeffs), 2):
+            coeffs[i+1] += coeffs[i] 
 
 
 
 
-def fft_r_l1(coeffs, m, G):
+def gm_fft_r_l1(coeffs, m, G, mode = GENERAL_BASIS):
     """
     Reverse process in the FFT algorithm.
 
@@ -154,17 +184,27 @@ def fft_r_l1(coeffs, m, G):
     list: The coefficients of the polynomial after applying the reverse FFT process.
     """
     input_size = 2
-    for r in reversed(range(1,m)):
-        offset=0
-        for b in range(0,2**r,2):
-            for i in range(input_size):
-                coeffs[offset + i] += an_element_in_basis(G[r-1], index=i) * coeffs[offset + input_size + i]
-                coeffs[offset + input_size + i] += coeffs[offset + i]
-            offset += input_size<<1      
-        input_size <<= 1  
+    if mode == GENERAL_BASIS:
+        for r in reversed(range(0,m-1)):
+            offset=0
+            for _ in range(1<<r):
+                for i in range(input_size):
+                    coeffs[offset + i] += an_element_in_basis(G[r], index=i) * coeffs[offset + input_size + i]
+                    coeffs[offset + input_size + i] += coeffs[offset + i]
+                offset += input_size<<1      
+            input_size <<= 1 
+    else:
+         for r in reversed(range(0,m-1)):
+            offset=0
+            for _ in range(1<<r):
+                for i in range(input_size):
+                    coeffs[offset + i] += an_element_in_basis(G, index=i<<r) * coeffs[offset + input_size + i]
+                    coeffs[offset + input_size + i] += coeffs[offset + i]
+                offset += input_size<<1      
+            input_size <<= 1 
 
 
-def fft_r_l2(coeffs, m, G_set):
+def gm_fft_r_l2(coeffs, m, G_set):
     """
     Reverse process in the FFT algorithm.
 
@@ -178,11 +218,12 @@ def fft_r_l2(coeffs, m, G_set):
     list: The coefficients of the polynomial after applying the reverse FFT process.
     """
     input_size = 2
-    for r in reversed(range(1,m)):
-        offset=0
-        for b in range(0,2**r,2):
-            for i in range(input_size):
-                coeffs[offset + i] += G_set[r-1][i] * coeffs[offset + input_size + i]
-                coeffs[offset + input_size + i] += coeffs[offset + i]
-            offset += input_size<<1      
-        input_size <<= 1  
+    if mode == GENERAL_BASIS:    
+        for r in reversed(range(0,m-1)):
+            offset=0
+            for _ in range(1<<r):
+                for i in range(input_size):
+                    coeffs[offset + i] += G_set[r][i] * coeffs[offset + input_size + i]
+                    coeffs[offset + input_size + i] += coeffs[offset + i]
+                offset += input_size<<1      
+            input_size <<= 1  
