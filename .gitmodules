@@ -1,0 +1,3 @@
+[submodule "C++/depends/libff"]
+	path = C++/depends/libff
+	url = https://github.com/mtbadakhshan/libff

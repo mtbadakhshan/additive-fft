@@ -31,7 +31,7 @@ def test_fft_cantor_mode(a, FF, ext_degree):
 
 
 def test_fft(a, FF, ext_degree):
-    N_tests = 100
+    N_tests = 1
     DIRECT_EVAUATION_TEST = False
     CANTOR_BASIS_TEST = True
     direct_eval_time = [0] * N_tests
@@ -41,7 +41,7 @@ def test_fft(a, FF, ext_degree):
     gm_fft_CO_with_precmp = [0] * N_tests
     gm_fft_CO_no_precmp_time_lvl2 = [0] * N_tests
 
-    m = 11
+    m = 14
     if CANTOR_BASIS_TEST:
         B = fast_initial_basis_computation(a, m, ext_degree)
         B.reverse()
