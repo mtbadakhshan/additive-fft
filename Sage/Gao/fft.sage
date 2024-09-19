@@ -25,19 +25,22 @@ def gm_fft(g_coeffs, m, B, mode=GENERAL_BASIS):
 
     if mode == CANTOR_BASIS:
         gm_fft_f_2(g_coeffs, m, None, CANTOR_BASIS)
-        B_set = span_basis(B)
-        gm_fft_r_l2(g_coeffs, m, B_set, CANTOR_BASIS)
-
-
+        gm_fft_r_l1(g_coeffs, m, B, CANTOR_BASIS)
 
 
 def gm_fft_no_precmp_lvl1(g_coeffs, m, B, G, D):
     gm_fft_f_2(g_coeffs, m, [B] + D)
     gm_fft_r_l1(g_coeffs, m, G)
 
-def gm_fft_no_precmp_lvl2(g_coeffs, m, B, G_set, D):
-    gm_fft_f_2(g_coeffs, m, [B] + D)
-    gm_fft_r_l2(g_coeffs, m, G_set)
+def gm_fft_no_precmp_lvl2(g_coeffs, m, B, G_set=None, D=None, mode=GENERAL_BASIS):
+    if mode == GENERAL_BASIS:
+        gm_fft_f_2(g_coeffs, m, [B] + D)
+        gm_fft_r_l2(g_coeffs, m, G_set)
+    if mode == CANTOR_BASIS:
+        gm_fft_f_2(g_coeffs, m, None, CANTOR_BASIS)
+        gm_fft_r_l2(g_coeffs, m, G_set, CANTOR_BASIS)
+
+
 
 
 def gm_fft_precmp_l1(m, B, mode = GENERAL_BASIS):
@@ -195,16 +198,17 @@ def gm_fft_r_l1(coeffs, m, G, mode = GENERAL_BASIS):
             input_size <<= 1 
     else:
          for r in reversed(range(0,m-1)):
+            G_Cantor = G[r:]
             offset=0
             for _ in range(1<<r):
                 for i in range(input_size):
-                    coeffs[offset + i] += an_element_in_basis(G, index=i<<r) * coeffs[offset + input_size + i]
+                    coeffs[offset + i] += an_element_in_basis(G_Cantor, index=i) * coeffs[offset + input_size + i]
                     coeffs[offset + input_size + i] += coeffs[offset + i]
                 offset += input_size<<1      
             input_size <<= 1 
 
 
-def gm_fft_r_l2(coeffs, m, G_set):
+def gm_fft_r_l2(coeffs, m, G_set, mode=GENERAL_BASIS):
     """
     Reverse process in the FFT algorithm.
 
@@ -224,6 +228,15 @@ def gm_fft_r_l2(coeffs, m, G_set):
             for _ in range(1<<r):
                 for i in range(input_size):
                     coeffs[offset + i] += G_set[r][i] * coeffs[offset + input_size + i]
+                    coeffs[offset + input_size + i] += coeffs[offset + i]
+                offset += input_size<<1      
+            input_size <<= 1  
+    else:
+        for r in reversed(range(0,m-1)):
+            offset=0
+            for _ in range(1<<r):
+                for i in range(input_size):
+                    coeffs[offset + i] += G_set[i<<r] * coeffs[offset + input_size + i]
                     coeffs[offset + input_size + i] += coeffs[offset + i]
                 offset += input_size<<1      
             input_size <<= 1  

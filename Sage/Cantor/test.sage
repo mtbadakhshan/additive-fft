@@ -1,5 +1,7 @@
 from time import time
 import copy
+import matplotlib.pyplot as plt
+
 
 
 load('fft.sage')
@@ -7,13 +9,13 @@ load('../utils/utils.sage')
 
 def test_fft(a, FF, ext_degree):
     N_tests = 100
-    DIRECT_EVAUATION_TEST = True
+    DIRECT_EVAUATION_TEST = False
     
     direct_eval_time = [0] * N_tests
     cantors_fft_no_precmp_time = [0] * N_tests
     cantors_fft_with_precmp_time = [0] * N_tests
 
-    m = 9
+    m = 11
     print("Entering Pre-computation")
     W, nz_hdt_S, table = fft_precmp(a, m, ext_degree)
     print("Finished Pre-computation")
@@ -55,6 +57,19 @@ def test_fft(a, FF, ext_degree):
         print("Average direct evaluation time:", sum(direct_eval_time)/N_tests, 's')
     print("Average Cantor's FFT time (excludes pre-computation):", sum(cantors_fft_no_precmp_time)/N_tests, 's')
     print("Average Cantor's FFT time (includes pre-computation):", sum(cantors_fft_with_precmp_time)/N_tests, 's')
+
+    test_numbers = list(range(N_tests))
+    plt.figure(figsize=(12, 6))
+    plt.plot(test_numbers, cantors_fft_with_precmp_time, marker='o', label='FFT Full')
+    plt.plot(test_numbers, cantors_fft_no_precmp_time, marker='s', label='FFT precomputed')
+
+    plt.xlabel('Test Number')
+    plt.ylabel('Time (seconds)')  # Adjust the unit if necessary
+    plt.title('FFT Timing Results Across Tests')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
     return (sum(direct_eval_time)/N_tests, sum(cantors_fft_no_precmp_time)/N_tests, sum(cantors_fft_with_precmp_time)/N_tests)
 

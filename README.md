@@ -24,3 +24,16 @@ Additive Fast Fourier Transforms over Finite Fields
 #### Gao's FFT (average over 10 iterations)
 - includes pre-computation: 5.390587258338928 s
 
+
+### 2. $m=11, GF(2^{256})$:
+### Cantor's FFT (average over 100 iterations)
+- Average Cantor's FFT time (excludes pre-computation): 0.06200750589370727 s
+- Average Cantor's FFT time (includes pre-computation): 0.08558360099792481 s
+
+### Gao's FFT over Cantor Basis (average over 100 iterations)
+- Average Gao's FFT time (excludes pre-computation lvl2):                   0.11530064821243285 s
+- Average Gao's FFT time (excludes pre-computation lvl1):                   0.1717957592010498 s
+- Average Gao's FFT time (Full: includes pre-computation):                  0.17836191177368163 s
+- Average Gao's Cantor optimized FFT time (excludes pre-computation lvl2):  0.10389098882675171 s
+- Average Gao's Cantor optimized FFT time (Full: includes pre-computation): 0.15841137647628784 s
+
