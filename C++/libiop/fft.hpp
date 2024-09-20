@@ -12,9 +12,9 @@
 
 #include <vector>
 
-#include "libiop/algebra/field_subset/field_subset.hpp"
-#include "libiop/algebra/field_subset/subspace.hpp"
-#include "libiop/algebra/field_subset/subgroup.hpp"
+#include "libiop/algebra/field_subset.hpp"
+#include "algebra/subspace.hpp"
+// #include "libiop/algebra/field_subset/subgroup.hpp"
 #include <libff/common/utils.hpp>
 
 namespace libiop {
@@ -44,42 +44,12 @@ std::vector<FieldT> additive_IFFT_wrapper(const std::vector<FieldT> &v,
                                           const affine_subspace<FieldT> &H);
 
 template<typename FieldT>
-std::vector<FieldT> multiplicative_FFT(const std::vector<FieldT> &poly_coeffs,
-                                       const multiplicative_coset<FieldT> &domain);
-
-template<typename FieldT>
-std::vector<FieldT> multiplicative_IFFT(const std::vector<FieldT> &evals,
-                                        const multiplicative_coset<FieldT> &domain);
-
-template<typename FieldT>
-std::vector<FieldT> multiplicative_FFT_wrapper(const std::vector<FieldT> &v,
-                                               const multiplicative_coset<FieldT> &H);
-
-template<typename FieldT>
-std::vector<FieldT> multiplicative_IFFT_wrapper(const std::vector<FieldT> &v,
-                                                const multiplicative_coset<FieldT> &H);
-
-template<typename FieldT>
-std::vector<FieldT> FFT_over_field_subset(const std::vector<typename libff::enable_if<libff::is_multiplicative<FieldT>::value, FieldT>::type> coeffs,
-                                            field_subset<FieldT> domain);
-
-template<typename FieldT>
 std::vector<FieldT> FFT_over_field_subset(const std::vector<typename libff::enable_if<libff::is_additive<FieldT>::value, FieldT>::type> coeffs,
                                             field_subset<FieldT> domain);
 
 template<typename FieldT>
-std::vector<FieldT> IFFT_over_field_subset(const std::vector<typename libff::enable_if<libff::is_multiplicative<FieldT>::value, FieldT>::type> evals,
-                                             field_subset<FieldT> domain);
-
-template<typename FieldT>
 std::vector<FieldT> IFFT_over_field_subset(const std::vector<typename libff::enable_if<libff::is_additive<FieldT>::value, FieldT>::type> evals,
                                              field_subset<FieldT> domain);
-
-template<typename FieldT>
-std::vector<FieldT> IFFT_of_known_degree_over_field_subset(
-    const std::vector<typename libff::enable_if<libff::is_multiplicative<FieldT>::value, FieldT>::type> evals,
-    size_t degree_bound,
-    field_subset<FieldT> domain);
 
 template<typename FieldT>
 std::vector<FieldT> IFFT_of_known_degree_over_field_subset(
@@ -89,6 +59,6 @@ std::vector<FieldT> IFFT_of_known_degree_over_field_subset(
 
 } // namespace libiop
 
-#include "libiop/algebra/fft.tcc"
+#include "libiop/fft.tcc"
 
 #endif // LIBIOP_ALGEBRA_FFT_HPP_
