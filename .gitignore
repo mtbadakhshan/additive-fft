@@ -1,2 +1,3 @@
 *.sage.py
 C++/build/
+.vscode/
