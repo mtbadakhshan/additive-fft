@@ -1,6 +1,6 @@
 import math
 
-def fft(g_coeffs, m, a, ext_degree):
+def fft(g_coeffs, m, a, ext_degree, affine_shift=0):
     """
     Computes the Fast Fourier Transform (FFT) of the polynomial g(x) using Cantor's algorithm.
 
@@ -21,8 +21,8 @@ def fft(g_coeffs, m, a, ext_degree):
       hold the values of g(x) evaluated at specific points from    
     """
     g_coeffs += [0]*(2**(m)-len(g_coeffs)) 
-    _, nz_hdt_S, table = fft_precmp(a, m, ext_degree)
-    fft_no_precmp(g_coeffs, m, nz_hdt_S, table)
+    _, nz_hdt_S, table = fft_precmp(a, m, ext_degree, affine_shift)
+    fft_no_precmp_parallel(g_coeffs, m, nz_hdt_S, table)
 
 def fft_no_precmp(g_coeffs, m, nz_hdt_S, table):
     """
@@ -41,20 +41,51 @@ def fft_no_precmp(g_coeffs, m, nz_hdt_S, table):
     * The result of the FFT is stored directly in g_coeffs, which is updated in place.
     """
     g_coeffs += [0]*(2**(m)-len(g_coeffs))
+    # print(len(table), "here")
+    input_size = len(g_coeffs)
+    n_modules = 1
+    # table = [item for sublist in table for item in sublist]
+    cnt = 0
+    for r in range(0,m):
+        offset = 0
+        for i in range(0, n_modules):
+            tail_module(g_coeffs, nz_hdt_S[r], input_size, offset, table[cnt])
+            cnt += 1
+            offset += input_size
+        input_size >>= 1
+        n_modules  <<= 1
+
+def fft_no_precmp_parallel(g_coeffs, m, nz_hdt_S, table):
+    g_coeffs += [0]*(2**(m)-len(g_coeffs))
     input_size = len(g_coeffs)
     n_modules = 1
 
-    head_module(g_coeffs, nz_hdt_S[0], input_size)
-    for r in range(1,m):
-        input_size >>= 1
-        n_modules  <<= 1
-        head_module(g_coeffs, nz_hdt_S[r], input_size)
+    # table = [item for sublist in table for item in sublist]
+    # print(len(table))
+    # quit()
+    cnt = 0
+    for r in range(0,m):
         offset = 0
-        for i in range(0, n_modules-1):
+        half_input_size = input_size >> 1
+        for i in range(0, n_modules):
+            mult_factor = table[cnt]
+            cnt += 1
+            offset2 = offset + half_input_size
+            for k in range(offset2+half_input_size -1, offset2 -1, -1):
+                g_k = g_coeffs[k]
+                for nz in nz_hdt_S[r][:-1]: 
+                    g_coeffs[k - nz] += g_k
+                g_coeffs[k-half_input_size] += g_k * mult_factor
+            for j in range(half_input_size):
+                g_coeffs[offset2+j] += g_coeffs[offset+j]  
             offset += input_size
-            tail_module(g_coeffs, nz_hdt_S[r], input_size, offset, table[r][i])
+        input_size = half_input_size
+        n_modules  <<= 1
 
-def fft_precmp(a, m, ext_degree):
+
+
+
+def fft_precmp(a, m, ext_degree, affine_shift=0):
     """
     Performs the precomputations required for Cantor's FFT algorithm. These precomputations include
     (1) constructing Cantor's basis, (2) computing the polynomials s_r(x) for each FFT round and determining 
@@ -78,8 +109,11 @@ def fft_precmp(a, m, ext_degree):
 
     """
     W = fast_initial_basis_computation(a, m, ext_degree)
-    nz_hdt_S = S_function_computation_2(m)
-    table = fast_S_shifts_table_generator(W)
+    nz_hdt_S, affine_shift_list = S_function_computation_2(m, affine_shift)
+    table = fast_S_shifts_table_generator(W, affine_shift_list)
+    # print(table)
+    # print(affine_shift_list)
+    # quit()
     return W, nz_hdt_S, table
 
 
@@ -109,7 +143,7 @@ def S_function_computation(m):
     # S.reverse()
     return nz_hdt_S
 
-def S_function_computation_2(m):
+def S_function_computation_2(m, affine_shift=0):
     """
     Computes the s_r(x) polynomials for each round r where 0 <= r < m. This implementation avoids the use of math.comb 
     and instead utilizes bitwise operations to determine the parity of binomial coefficients C(r, i).
@@ -126,23 +160,29 @@ def S_function_computation_2(m):
                            in the polynomial s_r(x) for each round r, ordered from the highest degree term (hdt) to the lowest.
     """
     # nz_hdt_S: Non zero coeffs indices in S. Note that index 0 is the coefficient of the highest degree term in s_r(x),
+    affine_shift_list = [affine_shift] * m
     nz_hdt_S = [[]] * (m)                   
-    for r in range(m):
-        nz_hdt_S[r] = [(1<<r)-1]
-        for i in range(1,r): # S_r(t) = \sum_{i=0}^{r} C(r,i)*(t^{2^i}). 
+    for r in range(m-1):
+        S_index = m + ~r
+        nz_hdt_S[r] = [(1<<S_index)-1]
+        for i in range(1,S_index): # S_r(t) = \sum_{i=0}^{r} C(r,i)*(t^{2^i}). 
                              # C(r,0) = 1, so we assigned that before loop.
                              # Also, C(r,r) = 1, so we will append that after loop.
-            is_odd = (r & True) or (not(i & True))
+            is_odd = (S_index & True) or (not(i & True))
             ii = i >> 1
-            rr = r >> 1
+            rr = S_index >> 1
             while(is_odd and ii>0):
                 is_odd = (rr & True) or (not(ii & True))
                 rr >>= 1
                 ii >>= 1
-            if (is_odd): nz_hdt_S[r].append((1<<r) - (1<<i)) # Non-zero coefficients indices in S ordered from highest degree term (hdt)       
+            if (is_odd): 
+                nz_hdt_S[r].append((1<<S_index) - (1<<i)) # Non-zero coefficients indices in S ordered from highest degree term (hdt)       
+                affine_shift_list[r] += affine_shift**(1<<i)
         nz_hdt_S[r].append(0)
-    nz_hdt_S.reverse()
-    return nz_hdt_S
+        affine_shift_list[r] += affine_shift**(1<<S_index)
+    # print(nz_hdt_S)
+    # print(affine_shift_list)
+    return nz_hdt_S, affine_shift_list
 
 def S_function_computation_3(m):
     """
@@ -215,7 +255,7 @@ def S_shifts_table_generator(S, W):
 
     return table
 
-def fast_S_shifts_table_generator(W):
+def fast_S_shifts_table_generator(W, affine_shift_list = None):
     """
     Computes the shift values required for the tail_module function. In each branch of each round, 
     the tail_module function requires the value of S_r(y_p + y_q), where y_p and y_q are either one of the basis elements in W
@@ -230,15 +270,22 @@ def fast_S_shifts_table_generator(W):
     table (list[list]): A list of lists, where each inner list contains the precomputed shift values for the tail_module function 
                         for each branch in each round.
     """
-    table = []
+    m = len(W)
+    table = [0] * ((1<<m)-1)
+    if affine_shift_list == None:
+        affine_shift_list = [0] * len(W)
+    cnt = 0
     for r in range(0, len(W)): # r is the row number. The first row is skipped as it only has a head module.
-        row = [0] * ((1<<(r)) - 1)  # 1<<(r) = 2^r which is the number of modlues in the row r. 
+        # row = [affine_shift_list[r]] * ((1<<(r)) )  # 1<<(r) = 2^r which is the number of modlues in the row r. 
                                     # The first module is skipped as it is a head module.     
+        table[cnt] = affine_shift_list[r]
+        cnt += 1
         for module in range(1, 1<<(r)): 
+            table[cnt] += affine_shift_list[r]
             for i in range(r):
                 if module & (1<<i): # if the i-th bit in the r-bit module number is set, add W[i+1] to the shift value.
-                    row[module-1] += W[i+1]
-        table += [row]
+                    table[cnt] += W[i+1]
+            cnt +=1
     return table
 
 
@@ -261,7 +308,7 @@ def eval_s_at_x(s, x):
         result += s[i] * (x ** i)
     return result
 
-def divide(coeffs, nz_hdt_S, input_size, offset):
+def divide(coeffs, nz_hdt_S, input_size, offset, multـfactor=1):
     """
     Computes the quotient q(x) = g(x) / s(x), where the dividend polynomial g(x) is represented 
     by the coefficients in coeffs[offset:offset+input_size], and the divisor polynomial s(x) 
@@ -279,22 +326,24 @@ def divide(coeffs, nz_hdt_S, input_size, offset):
     q (list): Coefficients of the quotient polynomial q(x).
     """
     # Initialize the quotient polynomial q(x), whose degree is at most half the degree of the dividend g(x).
-    q = [0] * (input_size>>1)       # The degree of q(x) is derived as deg(g(x)) - deg(s(x)).
+    # q = [0] * (input_size>>1)       # The degree of q(x) is derived as deg(g(x)) - deg(s(x)).
                                     # For input size 2^(r+1), we have deg(q) <= 2^r - 1 = input_size // 2 - 1.        
-    offset += len(q)
+    half_input_size = input_size>>1
+    offset += half_input_size
 
     # Process each term in the quotient by iterating over the coefficients in reverse order.
-    for q_ind, i in enumerate(reversed(range(offset,offset+len(q)))):   # The reason to use 'reversed()' is that coefficients are ordered from 
+    for i in reversed(range(offset,offset+half_input_size)):   # The reasorown to use 'reversed()' is that coefficients are ordered from 
                                                                         # the constant term up to the highest degree term. 
                                                                         # Therefore, the last element is the highest degree coefficient.
-        q[~q_ind] = coeffs[i]       # Using ~q_ind accesses elements from the end.
+        # q[~q_ind] = coeffs[i]       # Using ~q_ind accesses elements from the end.
 
         for nz in nz_hdt_S[:-1]:    # Exclude the highest degree term of s(x) (the last element of nz_hdt_S),
                                     # because it cancels out with coeffs[i].
             coeffs[i - nz] += coeffs[i]
-        coeffs[i] = 0 
-        q_ind += 1
-    return (q)
+        coeffs[i-half_input_size] += coeffs[i] * multـfactor
+        # coeffs[i] += coeffs[i-len(q)]
+
+        # q_ind += 1
 
 def head_module(coeffs, nz_hdt_S, input_size):
     """
@@ -326,7 +375,13 @@ def tail_module(coeffs, nz_hdt_S, input_size, offset, s_shift1):
 
     * This module modifies coeffs in place.
     """
-    q = divide(coeffs, nz_hdt_S, input_size, offset)
-    for i in range(len(q)):
-        coeffs[offset+i] = coeffs[offset+i] + q[i] * s_shift1
-        coeffs[offset+i+len(q)] = coeffs[offset+i] + q[i] 
+    divide(coeffs, nz_hdt_S, input_size, offset, s_shift1)
+    # if (q != coeffs[offset+len(q):offset+2*len(q)]):
+    #     print ("q:", q)
+    #     print (f"coeffs[{offset}+{len(q)}:{offset}+2*{len(q)}:", coeffs[offset+len(q):offset+2*len(q)])
+    #     quit()
+    half_input_size = input_size >> 1
+    for i in range(half_input_size):
+        # coeffs[offset+i] += coeffs[offset+i+len(q)] * s_shift1
+        coeffs[offset+i+half_input_size] += coeffs[offset+i]  
+        pass

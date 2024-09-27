@@ -1,7 +1,7 @@
-def span_basis(B):
+def span_basis(B, affine_shift=0):
     subset = [0] * 2**len(B)
     for i in range(len(subset)):
-        subset[i] = an_element_in_basis(B, i)
+        subset[i] = an_element_in_basis(B, i) + affine_shift
     return subset
 
 def polynomial_to_string(coeffs):

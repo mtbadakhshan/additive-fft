@@ -39,3 +39,24 @@ std::vector<FieldT> cantor_basis(size_t m)
 
     return basis;
 }
+
+template <typename FieldT>
+std::vector<FieldT> divide  (std::vector<FieldT> &g, 
+                            const std::vector<size_t> &nz_S, 
+                            const size_t input_size, 
+                            const size_t offset){
+    std::vector<FieldT> q;
+    
+}
+
+template <typename T>
+void my_print_vector(const std::vector<T> &v)
+{
+    std::cout <<"{ ";
+    for (auto const& elem : v)
+    {
+        std::cout << elem << " ";
+    }
+    std::cout << "}" << std::endl;
+}
+

@@ -1,6 +1,7 @@
 #include "libiop/algebra/subspace.hpp"
 #include "libiop/algebra/utils.hpp"
 #include "libiop/fft.hpp"
+#include <cstddef>
 #include <iostream>
 #include <libff/algebra/fields/binary/gf64.hpp>
 #include <libff/algebra/fields/binary/gf32.hpp>
@@ -8,6 +9,7 @@
 #include <vector>
 
 #include "utils/utils.hpp"
+#include "Cantor/fft.hpp"
 
 template <typename T>
 bool check_equal(const std::vector<T> &v1, const std::vector<T> &v2)
@@ -22,26 +24,22 @@ bool check_equal(const std::vector<T> &v1, const std::vector<T> &v2)
     return true;
 }
 
-template <typename T>
-void my_print_vector(const std::vector<T> &v)
-{
-    std::cout <<"{ ";
-    for (auto const& elem : v)
-    {
-        std::cout << elem << " ";
-    }
-    std::cout << "}" << std::endl;
-}
+
 
 int main()
 {
     std::cout << "Start testing!\n";
     typedef libff::gf32 FieldT;
 
-    std::vector<FieldT> result(cantor_basis<FieldT>(5));
-    my_print_vector(result);
+    size_t m = 15;
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+    my_print_vector(basis);
 
-    // libff::print_vector<FieldT>(static_cast<std::vector<FieldT>>(result));
+    libiop::field_subset<FieldT> domain = libiop::field_subset<FieldT>(libiop::affine_subspace<FieldT>(basis));
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+
+    const std::vector<FieldT> cantor_result = cantor_additive_FFT<FieldT>(poly_coeffs, domain.subspace());
+
 
 
 

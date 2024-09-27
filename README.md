@@ -37,3 +37,10 @@ Additive Fast Fourier Transforms over Finite Fields
 - Average Gao's Cantor optimized FFT time (excludes pre-computation lvl2):  0.10389098882675171 s
 - Average Gao's Cantor optimized FFT time (Full: includes pre-computation): 0.15841137647628784 s
 
+
+### 3. $m=11, GF(2^{256})$ Affine space: 
+- Average direct evaluation time: 2.6934192204475402 s
+- Average Cantor's FFT time (excludes pre-computation): 0.03471111297607422 s
+- Average Cantor's FFT time (excludes pre-computation - parallel mode): 0.03284716844558716 s
+- Average Cantor's FFT time (includes pre-computation - parallel mode): 0.04717706918716431 s
+
