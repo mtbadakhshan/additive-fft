@@ -54,7 +54,7 @@ def plot_benchmark_results(results):
 
 # Main script execution
 if __name__ == "__main__":
-    output_file = "benchmark_output.json"
+    output_file = "build/benchmark_output.json"
     min_range = 5
     max_range = 20
     benchmark_repetitions = 100
