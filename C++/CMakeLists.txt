@@ -12,13 +12,13 @@ find_package(PkgConfig REQUIRED)
 # Use pkg-config to find libsodium
 pkg_check_modules(LIBSODIUM REQUIRED libsodium)
 
-
+# Add Libff 
 add_subdirectory(depends/libff)
 
-add_executable(benchmark benchmark.cpp)
+add_executable(main main.cpp)
 
 target_include_directories(
-    benchmark
+    main
 
     PRIVATE
     depends/libff
@@ -26,14 +26,39 @@ target_include_directories(
     .
 )
 
-
 target_link_libraries(
-    benchmark 
+    main 
     PRIVATE 
     
     ${LIBSODIUM_LIBRARIES}
     ff
 )
 
+# Add Google Benchmark
+set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "Disable GTest tests in Benchmark" FORCE)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable testing of the Benchmark" FORCE)
 
+add_subdirectory(depends/benchmark) # Assuming benchmark is cloned in a subdirectory named 'benchmark'
+
+add_executable(run_benchmark benchmark.cpp)
+
+
+target_include_directories(
+    run_benchmark
+
+    PRIVATE
+    depends/libff
+    depends/benchmark/include
+    ${LIBSODIUM_INCLUDE_DIRS}
+    .
+)
+
+target_link_libraries(
+    run_benchmark 
+    PRIVATE 
+    
+    ${LIBSODIUM_LIBRARIES}
+    ff
+    benchmark::benchmark
+)
 

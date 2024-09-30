@@ -59,10 +59,6 @@ def fft_no_precmp_parallel(g_coeffs, m, nz_hdt_S, table):
     g_coeffs += [0]*(2**(m)-len(g_coeffs))
     input_size = len(g_coeffs)
     n_modules = 1
-
-    # table = [item for sublist in table for item in sublist]
-    # print(len(table))
-    # quit()
     cnt = 0
     for r in range(0,m):
         offset = 0
@@ -180,8 +176,6 @@ def S_function_computation_2(m, affine_shift=0):
                 affine_shift_list[r] += affine_shift**(1<<i)
         nz_hdt_S[r].append(0)
         affine_shift_list[r] += affine_shift**(1<<S_index)
-    # print(nz_hdt_S)
-    # print(affine_shift_list)
     return nz_hdt_S, affine_shift_list
 
 def S_function_computation_3(m):

@@ -1,3 +1,6 @@
 [submodule "C++/depends/libff"]
 	path = C++/depends/libff
 	url = https://github.com/mtbadakhshan/libff
+[submodule "C++/depends/benchmark"]
+	path = C++/depends/benchmark
+	url = https://github.com/google/benchmark.git

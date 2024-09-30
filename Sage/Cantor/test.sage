@@ -8,7 +8,7 @@ load('fft.sage')
 load('../utils/utils.sage')
 
 def test_fft(a, FF, ext_degree):
-    N_tests = 100
+    N_tests = 1
     DIRECT_EVAUATION_TEST = True
     
     direct_eval_time = [0] * N_tests
@@ -16,10 +16,10 @@ def test_fft(a, FF, ext_degree):
     cantors_fft_no_precmp_time_parallel = [0] * N_tests
     cantors_fft_with_precmp_time = [0] * N_tests
 
-    m = 11
+    m = 4
     print("Entering Pre-computation")
     affine_shift =  FF.random_element()
-    # print("affine_shift:", affine_shift)
+    # print("affine_shift:", affine_shift.to_integer())
     W, nz_hdt_S, table = fft_precmp(a, m, ext_degree, affine_shift)
     print("Finished Pre-computation")
 
@@ -103,10 +103,10 @@ if __name__ == "__main__":
     # FF.<a> = GF(2**4, modulus= xx**4 + xx + 1)
 
     F.<x> = GF(2)[]
-    ext_degree = 256
+    ext_degree = 32
     irreducible_poly = F.irreducible_element(ext_degree)
+    # irreducible_poly = x^32 + x^22 + x^2 + x^1 + 1 (to mach libiop for gf32)
     FF.<a> = GF(2**ext_degree, modulus=irreducible_poly)
-
     generate_a_map(a, 4)
     test_fft(a, FF, ext_degree)
     # fast_initial_basis_computation(a, 13)

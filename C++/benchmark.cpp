@@ -1,76 +1,30 @@
+#include <benchmark/benchmark.h>
+#include <libff/algebra/fields/binary/gf256.hpp>
 #include "libiop/algebra/subspace.hpp"
 #include "libiop/algebra/utils.hpp"
 #include "libiop/fft.hpp"
-#include <cstddef>
-#include <iostream>
-#include <libff/algebra/fields/binary/gf64.hpp>
-#include <libff/algebra/fields/binary/gf32.hpp>
-#include <libff/common/utils.hpp>
-#include <vector>
 
-#include "utils/utils.hpp"
-#include "Cantor/fft.hpp"
+//Benchmark for libiop::additive_fft
+static void BM_libiop_additive_fft(benchmark::State &state){
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
 
-template <typename T>
-bool check_equal(const std::vector<T> &v1, const std::vector<T> &v2)
-{
-    for (size_t i = 0; i < v1.size(); ++i)
+    for (auto _ : state)
     {
-        if (v1[i] != v2[i])
-        {
-            return false;
-        }
+        state.PauseTiming();
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+        libiop::field_subset<FieldT> domain = libiop::field_subset<FieldT>(libiop::affine_subspace<FieldT>::random_affine_subspace(m));
+        state.ResumeTiming();
+
+        benchmark::DoNotOptimize(poly_coeffs);
+        benchmark::DoNotOptimize(domain);
+
+        const std::vector<FieldT> result = libiop::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
+        benchmark::ClobberMemory();
     }
-    return true;
+    state.SetItemsProcessed(state.iterations());
 }
 
+BENCHMARK(BM_libiop_additive_fft)->Range(4, 15)->Unit(benchmark::kMicrosecond);
 
-
-int main()
-{
-    std::cout << "Start testing!\n";
-    typedef libff::gf32 FieldT;
-
-    size_t m = 15;
-    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
-    my_print_vector(basis);
-
-    libiop::field_subset<FieldT> domain = libiop::field_subset<FieldT>(libiop::affine_subspace<FieldT>(basis));
-    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
-
-    const std::vector<FieldT> cantor_result = cantor_additive_FFT<FieldT>(poly_coeffs, domain.subspace());
-
-
-
-
-    // FieldT element = FieldT::random_element();
-    // std::cout << "element.extension_degree() " << element.extension_degree() << std::endl;
-    // std::cout << "field_trace_binary of " << element << " is :" << field_trace_binary(element) << std::endl;
-
-    if (false)
-    {
-        for (size_t m = 1; m <= 11; ++m)
-        {
-
-            std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
-            libiop::field_subset<FieldT> domain = libiop::field_subset<FieldT>(
-                libiop::affine_subspace<FieldT>::random_affine_subspace(m));
-
-            std::cout << "domain dimension: " << domain.dimension() << std::endl;
-            std::cout << "domain size: " << domain.num_elements() << std::endl;
-
-            /* Additive equals naive */
-            const std::vector<FieldT> naive_result =
-                libiop::naive_FFT<FieldT>(poly_coeffs, domain);
-            const std::vector<FieldT> additive_result =
-                libiop::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
-
-            std::cout << "m = " << m << std::endl;
-            std::cout << "naive_result[0] = " << naive_result[0] << std::endl;
-            std::cout << "additive_result[0] = " << additive_result[0] << std::endl;
-
-            std::cout << "Equality check" << check_equal<FieldT>(naive_result, naive_result) << std::endl;
-        }
-    }
-    return 0;
-}
+BENCHMARK_MAIN();
