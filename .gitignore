@@ -1,3 +1,4 @@
 *.sage.py
 C++/build/
 .vscode/
+benchmark_output.json

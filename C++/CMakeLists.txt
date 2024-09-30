@@ -6,6 +6,19 @@ project(additive-fft
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Add optimization flags based on the build type
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  # Enable high-level optimizations and architecture-specific tuning
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -DNDEBUG")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # Debug flags (optional, modify as needed)
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+endif()
+
 #Find the pkg-config package
 find_package(PkgConfig REQUIRED)
 
