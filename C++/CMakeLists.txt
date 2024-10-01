@@ -1,3 +1,4 @@
+include(CMakePrintHelpers)
 cmake_minimum_required(VERSION 3.10)
 project(additive-fft
     DESCRIPTION "Library for additive FFT")
@@ -18,6 +19,8 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Debug flags (optional, modify as needed)
   set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 endif()
+
+cmake_print_variables(CMAKE_BUILD_TYPE)
 
 #Find the pkg-config package
 find_package(PkgConfig REQUIRED)

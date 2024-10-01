@@ -7,6 +7,24 @@
 #include "Cantor/fft.hpp"
 #include "Gao/fft.hpp"
 
+// Benchmark for libiop::naive_FFT -----------------------------------------------------------------------------------------------------------------------
+static void BM_libiop_naive_fft(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+    libiop::field_subset<FieldT> domain = libiop::field_subset<FieldT>(libiop::affine_subspace<FieldT>::random_affine_subspace(m));
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(poly_coeffs);
+        benchmark::DoNotOptimize(domain);
+        benchmark::DoNotOptimize(result = libiop::naive_FFT<FieldT>(poly_coeffs, domain));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
 // Benchmark for libiop::additive_FFT -----------------------------------------------------------------------------------------------------------------------
 static void BM_libiop_additive_fft(benchmark::State &state)
 {
@@ -150,7 +168,7 @@ static void BM_cantor_additive_fft_precmp(benchmark::State &state)
 const int MIN_RANGE = std::stoi(std::getenv("BM_MIN_RANGE"));
 const int MAX_RANGE = std::stoi(std::getenv("BM_MAX_RANGE"));
 
-
+BENCHMARK(BM_libiop_naive_fft)->DenseRange(MIN_RANGE, 15)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_libiop_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_gao_additive_fft_lvl1)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_gao_additive_fft_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);

@@ -26,23 +26,28 @@ def parse_benchmark_output(output_file="benchmark_output.json"):
     results = {}
     
     for benchmark in data['benchmarks']:
-        algo_name = benchmark['name'].split('/')[0]
-        range_val = int(benchmark['name'].split('/')[1])
-        
-        if algo_name not in results:
-            results[algo_name] = {'range': [], 'mean': []}
-        
-        results[algo_name]['range'].append(range_val)
-        results[algo_name]['mean'].append(benchmark['cpu_time'] / 1e3)  # Convert to microseconds
+        if (benchmark['aggregate_name'] == 'mean'):
+            algo_name = benchmark['run_name'].split('/')[0]
+            range_val = int(benchmark['run_name'].split('/')[1])
+
+            
+            if algo_name not in results:
+                results[algo_name] = {'range': [], 'mean': []}
+            
+            results[algo_name]['range'].append(range_val)
+            results[algo_name]['mean'].append(benchmark['cpu_time'])  # Convert to microseconds
+
     
     return results
 
 # Function to plot the benchmark results
 def plot_benchmark_results(results):
     plt.figure(figsize=(10, 6))
-    
-    for algo, data in results.items():
-        plt.plot(data['range'], data['mean'], label=algo, marker='o', markersize=3, linewidth=1)
+    markers = ['o', '^', 'v', '<', '>', 'x', 'p', '*', 's', 'D']
+
+    for i, (algo, data) in enumerate(results.items()):
+        marker = markers[i % len(markers)]
+        plt.plot(data['range'], data['mean'], label=algo, marker=marker, markersize=3, linewidth=1)
     
     plt.xlabel('Range (log2 size)')
     plt.ylabel('Time (microseconds)')
@@ -55,9 +60,9 @@ def plot_benchmark_results(results):
 # Main script execution
 if __name__ == "__main__":
     output_file = "build/benchmark_output.json"
-    min_range = 5
-    max_range = 20
-    benchmark_repetitions = 100
+    min_range = 2
+    max_range = 25
+    benchmark_repetitions = 1000
     # Run the benchmark if the output file does not exist
     if not os.path.exists(output_file):
         run_benchmark(min_range, max_range, benchmark_repetitions, output_file)
