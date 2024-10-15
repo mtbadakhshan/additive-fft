@@ -29,15 +29,13 @@ PreComputedValues<FieldT> pre_computation(const libiop::affine_subspace<FieldT> 
             nz_S.reserve(S_index);
             nz_S.emplace_back((1<<S_index)-1); // C(x,0) = 1, so we assigned that before loop.
             for (size_t i = 1; i < S_index; ++i){
-                bool is_odd = (S_index & 1) | (~i & 1);
-                size_t ii = i >> 1;
-                size_t rr = S_index >> 1;
-                while (is_odd && ii>0){
-                    is_odd = (rr & 1) | (~ii & 1);
+                size_t ii = i ;
+                size_t rr = S_index;
+                while (((rr & 1) | (~ii & 1)) && ii>0){
                     ii >>= 1;
                     rr >>= 1;
                 }
-                if (is_odd){
+                if (ii == 0){
                     nz_S.emplace_back((1<<S_index) - (1<<i));
                     affine_shift_round += affine_shift ^ (1<<i);
                 }
@@ -134,15 +132,13 @@ std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
             nz_S.reserve(S_index);
             nz_S.emplace_back((1<<S_index)-1); // C(x,0) = 1, so we assigned that before loop.
             for (size_t i = 1; i < S_index; ++i){
-                bool is_odd = (S_index & 1) | (~i & 1);
-                size_t ii = i >> 1;
-                size_t rr = S_index >> 1;
-                while (is_odd && ii>0){
-                    is_odd = (rr & 1) | (~ii & 1);
+                size_t ii = i ;
+                size_t rr = S_index;
+                while (((rr & 1) | (~ii & 1)) && ii>0){
                     ii >>= 1;
                     rr >>= 1;
                 }
-                if (is_odd){
+                if (ii == 0){
                     nz_S.emplace_back((1<<S_index) - (1<<i));
                     affine_shift_round += affine_shift ^ (1<<i);
                 }

@@ -33,7 +33,7 @@ bool check_equal(const std::vector<T> &v1, const std::vector<T> &v2)
 /* This test uses different domains; hence, the timing report might be more accurate due to minimizing CPU's caching*/
 void Cantor_FFT_Test(){
     typedef libff::gf256 FieldT;
-    size_t m = 20;
+    size_t m = 15;
     size_t N_test = 100;
     std::cout << "m = " << m << ", N_test = " << N_test << ", F = GF(2^"<<FieldT::extension_degree()<<")" << std::endl;
     std::vector<double> durations_Cantor(N_test);
@@ -56,12 +56,16 @@ void Cantor_FFT_Test(){
         Cantor_sum += durations_Cantor[i];
 
         // Gao test
-        libiop::field_subset<FieldT> gao_domain = libiop::field_subset<FieldT>(libiop::affine_subspace<FieldT>::random_affine_subspace(m));
+        // libiop::field_subset<FieldT> gao_domain = libiop::field_subset<FieldT>(libiop::affine_subspace<FieldT>::random_affine_subspace(m));
+        libiop::field_subset<FieldT> gao_domain = cantor_domain;
         start = std::chrono::high_resolution_clock::now();
         const std::vector<FieldT> additive_result = libiop::additive_FFT<FieldT>(poly_coeffs, gao_domain.subspace());    // my_print_vector<FieldT>(cantor_result);
         stop = std::chrono::high_resolution_clock::now();
         durations_Gao[i] = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
         Gao_sum += durations_Gao[i];
+
+        std::cout << "Equality check: " << (check_equal<FieldT>(additive_result, cantor_result) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
+
     }
     
     double cantor_variance_sum = 0.0;
@@ -74,7 +78,6 @@ void Cantor_FFT_Test(){
         gao_variance_sum += (duration - (Gao_sum / N_test)) * (duration - (Gao_sum / N_test));
     }
 
-    // std::cout << "Equality check: " << (check_equal<FieldT>(additive_result, cantor_result) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
     std::cout << "Cantor's average duration: " << Cantor_sum / N_test << " ms \t Standard deviations: " << std::sqrt(cantor_variance_sum / N_test) << std::endl;
     std::cout << "Gao's    average duration: " << Gao_sum    / N_test << " ms \t Standard deviations: " << std::sqrt(gao_variance_sum    / N_test) << std::endl;
 
@@ -126,9 +129,13 @@ void Gao_CO_FFT_Test(){
 /* This test is primarely for correctness check. We use the same domain; hence, the timing report might not be accurate due to CPU's caching*/
 void Cantor_FFT_PreComputation_Test(){
     typedef libff::gf128 FieldT;
-    size_t m = 25;
+    size_t m = 15;
     std::cout << "m = " << m << ", Start testing!\n";
 
+    size_t N_test = 10;
+
+    for (size_t i=0; i<N_test; ++i){
+    std::cout<<"test "<< i+1 << std::endl;
     std::vector<FieldT> basis(cantor_basis<FieldT>(m));
     libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
     std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
@@ -148,6 +155,8 @@ void Cantor_FFT_PreComputation_Test(){
     std::cout << "Equality check: " << (check_equal<FieldT>(cantor_precmp_result, cantor_result) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
     std::cout << "Cantor's Duration (pre computed): " << duration_Cantor_precmp.count()<< " ms" << std::endl;
     std::cout << "Cantor's Duration: " << duration_Cantor.count()<< " ms" << std::endl;
+
+    }
 }
 
 /* This test is primarely for correctness check. We use the same domain; hence, the timing report might not be accurate due to CPU's caching*/
@@ -188,9 +197,9 @@ void Gao_FFT_PreComputation_Test(){
 int main()
 {
     
-    // Cantor_FFT_Test();
-    Gao_CO_FFT_Test();
-    // Cantor_FFT_PreComputation_Test();
+    Cantor_FFT_Test();
+    // Gao_CO_FFT_Test();
+    Cantor_FFT_PreComputation_Test();
     // Gao_FFT_PreComputation_Test();
 
 

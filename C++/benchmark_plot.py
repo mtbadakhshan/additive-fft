@@ -61,7 +61,7 @@ def plot_benchmark_results(results):
 if __name__ == "__main__":
     output_file = "build/benchmark_output.json"
     min_range = 2
-    max_range = 25
+    max_range = 23
     benchmark_repetitions = 1000
     # Run the benchmark if the output file does not exist
     if not os.path.exists(output_file):
