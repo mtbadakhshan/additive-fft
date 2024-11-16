@@ -2,6 +2,7 @@ import subprocess
 import json
 import matplotlib.pyplot as plt
 import os
+import csv
 
 # Build and run the benchmark (assuming the build directory is './build' and cmake is configured)
 def run_benchmark(min_range, max_range, benchmark_repetitions, output_file="benchmark_output.json"):
@@ -40,6 +41,17 @@ def parse_benchmark_output(output_file="benchmark_output.json"):
     
     return results
 
+def write_to_csv_per_algorithm(results, path):
+    for algo_name, values in results.items():
+        output_csv = path + f"{algo_name}.csv"
+        with open(output_csv, mode='w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Range', 'Mean CPU Time (microseconds)'])
+            for r, mean in zip(values['range'], values['mean']):
+                writer.writerow([r, mean])
+        print(f"Data for {algo_name} written to {output_csv}")
+
+
 # Function to plot the benchmark results
 def plot_benchmark_results(results):
     plt.figure(figsize=(10, 6))
@@ -59,16 +71,17 @@ def plot_benchmark_results(results):
 
 # Main script execution
 if __name__ == "__main__":
-    output_file = "build/benchmark_output.json"
+    output_file = "../data_backup/benchmark_output.json" #"build/benchmark_output.json"
     min_range = 2
     max_range = 23
     benchmark_repetitions = 200
     # Run the benchmark if the output file does not exist
-    if not os.path.exists(output_file):
-        run_benchmark(min_range, max_range, benchmark_repetitions, output_file)
+    # if not os.path.exists(output_file):
+    #     run_benchmark(min_range, max_range, benchmark_repetitions, output_file)
     
     # Parse the benchmark output
     benchmark_results = parse_benchmark_output(output_file)
+    write_to_csv_per_algorithm(benchmark_results, "../data_backup/")
     
     # Plot the results
     plot_benchmark_results(benchmark_results)

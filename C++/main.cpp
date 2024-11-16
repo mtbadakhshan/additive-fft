@@ -194,40 +194,27 @@ void Gao_FFT_PreComputation_Test(){
 
 }
 
+void Valgrid_libiop_test(){
+    typedef libff::gf256 FieldT;
+    size_t m = 20;
+    std::cout << "m = " << m << ", Start testing!\n";
+
+    //Domain Creation
+    libiop::field_subset<FieldT> domain = libiop::field_subset<FieldT>(libiop::affine_subspace<FieldT>::random_affine_subspace(m));
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+
+    const std::vector<FieldT> gao_result = libiop::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
+}
+
 int main()
 {
     
     // Cantor_FFT_Test();
-    // // Gao_CO_FFT_Test();
+    Gao_CO_FFT_Test();
     // Cantor_FFT_PreComputation_Test();
-    Gao_FFT_PreComputation_Test();
+    // Gao_FFT_PreComputation_Test();
 
+    Valgrid_libiop_test();
 
-    typedef libff::gf128 FieldT;
-    if (false)
-    {
-        for (size_t m = 1; m <= 11; ++m)
-        {
-
-            std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
-            libiop::field_subset<FieldT> domain = libiop::field_subset<FieldT>(
-                libiop::affine_subspace<FieldT>::random_affine_subspace(m));
-
-            std::cout << "domain dimension: " << domain.dimension() << std::endl;
-            std::cout << "domain size: " << domain.num_elements() << std::endl;
-
-            /* Additive equals naive */
-            const std::vector<FieldT> naive_result =
-                libiop::naive_FFT<FieldT>(poly_coeffs, domain);
-            const std::vector<FieldT> additive_result =
-                libiop::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
-
-            std::cout << "m = " << m << std::endl;
-            std::cout << "naive_result[0] = " << naive_result[0] << std::endl;
-            std::cout << "additive_result[0] = " << additive_result[0] << std::endl;
-
-            std::cout << "Equality check: " << check_equal<FieldT>(naive_result, additive_result) << std::endl;
-        }
-    }
     return 0;
 }
