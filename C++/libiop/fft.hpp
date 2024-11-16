@@ -27,6 +27,11 @@ std::vector<FieldT> naive_FFT(const std::vector<FieldT> &poly_coeffs,
 
 template<typename FieldT>
 std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
+                                 const affine_subspace<FieldT> &domain,
+                                 std::vector<std::vector<double>>& timings);
+
+template<typename FieldT>
+std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
                                  const affine_subspace<FieldT> &domain);
 
 template<typename FieldT>

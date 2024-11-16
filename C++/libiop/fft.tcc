@@ -7,6 +7,8 @@
 #include <libff/algebra/field_utils/field_utils.hpp>
 #include "libiop/algebra/utils.hpp"
 
+#include <chrono>
+
 namespace libiop {
 
 /* Performs naive computation of the polynomial evaluation
@@ -38,8 +40,15 @@ std::vector<FieldT> naive_FFT(const std::vector<FieldT> &poly_coeffs,
 
 template<typename FieldT>
 std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
-                                 const affine_subspace<FieldT> &domain)
+                                 const affine_subspace<FieldT> &domain,
+                                 std::vector<std::vector<double>>& timings
+                                 )
 {
+    using Clock = std::chrono::high_resolution_clock;
+    std::vector<double> run_timings;
+    
+    auto total_start = Clock::now();  // ------------------- start: Total funciton -------------------
+    auto start = Clock::now();  // ------------------- start: Initialization -------------------
     std::vector<FieldT> S(poly_coeffs);
     S.resize(domain.num_elements(), FieldT::zero());
 
@@ -53,10 +62,15 @@ std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
 
     std::vector<FieldT> betas2(domain.basis());
     FieldT shift2 = domain.shift();
+    auto end = Clock::now();   // ------------------- end: Initialization -------------------
+    run_timings.push_back(std::chrono::duration<double, std::milli>(end - start).count());
+    
     for (size_t j = 0; j < m; ++j)
     {
+        start = Clock::now();       // ------------------- start: Scaling -------------------
         FieldT beta = betas2[m-1-j];
         FieldT betai(1);
+
 
         /* twist by beta. TODO: this can often be elided by a careful choice of betas */
         for (size_t ofs = 0; ofs < n; ofs += (1ull<<j))
@@ -68,6 +82,9 @@ std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
 
             betai *= beta;
         }
+        end = Clock::now();         // ------------------- end: Scaling -------------------
+        run_timings.push_back(std::chrono::duration<double, std::milli>(end - start).count());
+        start = Clock::now();       // ------------------- start: Taylor Ex. -------------------
 
         /* perform radix conversion */
         for (size_t stride = n/4; stride >= (1ul << j); stride >>= 1)
@@ -81,6 +98,10 @@ std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
                 }
             }
         }
+        end = Clock::now();         // ------------------- end: Taylor Ex. -------------------
+        run_timings.push_back(std::chrono::duration<double, std::milli>(end - start).count());
+        start = Clock::now();       // ------------------- start: Basis computation -------------------
+
 
         /* compute deltas used in the reverse process */
         FieldT betainv = beta.inverse();
@@ -94,20 +115,29 @@ std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
         FieldT newshift = shift2 * betainv;
         recursed_shifts[j] = newshift;
         shift2 = newshift.squared() - newshift;
+        end = Clock::now();         // ------------------- end: Basis computation -------------------
+        run_timings.push_back(std::chrono::duration<double, std::milli>(end - start).count());
     }
 
+    start = Clock::now();       // ------------------- start: Bitreverse Vector -------------------
     bitreverse_vector<FieldT>(S);
+    end = Clock::now();         // ------------------- end: Bitreverse Vector -------------------
+    run_timings.push_back(std::chrono::duration<double, std::milli>(end - start).count());
 
     /* unwind the recursion */
     for (size_t j = 0; j < m; ++j)
     {
+        start = Clock::now();       // ------------------- start: Span -------------------
         recursed_betas_ptr -= j;
         /* note that this devolves to empty range for the first loop iteration */
         std::vector<FieldT> popped_betas = std::vector<FieldT>(recursed_betas.begin()+recursed_betas_ptr,
                                                                recursed_betas.begin()+recursed_betas_ptr+j);
         const FieldT popped_shift = recursed_shifts[m-1-j];
         std::vector<FieldT> sums = all_subset_sums<FieldT>(popped_betas, popped_shift);
+        end = Clock::now();         // ------------------- end: Span  -------------------
+        run_timings.push_back(std::chrono::duration<double, std::milli>(end - start).count());
 
+        start = Clock::now();       // ------------------- start: Aggregate -------------------
         size_t stride = 1ull<<j;
         for (size_t ofs = 0; ofs < n; ofs += 2*stride)
         {
@@ -117,9 +147,14 @@ std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
                 S[ofs+stride+i] += S[ofs+i];
             }
         }
+        end = Clock::now();         // ------------------- end: Aggregate  -------------------
+        run_timings.push_back(std::chrono::duration<double, std::milli>(end - start).count());
     }
     assert(recursed_betas_ptr == 0);
 
+    auto total_end = Clock::now();  // ------------------- end: Total funciton -------------------
+    run_timings.push_back(std::chrono::duration<double, std::milli>(total_end - total_start).count());
+    timings.push_back(run_timings);
     return S;
 }
 
