@@ -162,7 +162,7 @@ void Cantor_FFT_PreComputation_Test(){
 /* This test is primarely for correctness check. We use the same domain; hence, the timing report might not be accurate due to CPU's caching*/
 void Gao_FFT_PreComputation_Test(){
     typedef libff::gf256 FieldT;
-    size_t m = 22;
+    size_t m = 18;
     std::cout << "m = " << m << ", Start testing!\n";
 
     libiop::field_subset<FieldT> domain = libiop::field_subset<FieldT>(libiop::affine_subspace<FieldT>::random_affine_subspace(m));
@@ -188,19 +188,19 @@ void Gao_FFT_PreComputation_Test(){
 
     std::cout << "Level1 Equality check: " << (check_equal<FieldT>(gao_precmp_result_lvl1, gao_result) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
     std::cout << "Level2 Equality check: " << (check_equal<FieldT>(gao_precmp_result_lvl2, gao_result) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
-    std::cout << "Cantor's Duration (pre computed level1): " << duration_gao_precmp_lvl1.count()<< " ms" << std::endl;
-    std::cout << "Cantor's Duration (pre computed level2): " << duration_gao_precmp_lvl2.count()<< " ms" << std::endl;
-    std::cout << "Cantor's Duration: " << duration_Gao.count()<< " ms" << std::endl;
+    std::cout << "Gao's Duration (pre computed level1): " << duration_gao_precmp_lvl1.count()<< " ms" << std::endl;
+    std::cout << "Gao's Duration (pre computed level2): " << duration_gao_precmp_lvl2.count()<< " ms" << std::endl;
+    std::cout << "Gao's Duration: " << duration_Gao.count()<< " ms" << std::endl;
 
 }
 
 int main()
 {
     
-    Cantor_FFT_Test();
-    // Gao_CO_FFT_Test();
-    Cantor_FFT_PreComputation_Test();
-    // Gao_FFT_PreComputation_Test();
+    // Cantor_FFT_Test();
+    // // Gao_CO_FFT_Test();
+    // Cantor_FFT_PreComputation_Test();
+    Gao_FFT_PreComputation_Test();
 
 
     typedef libff::gf128 FieldT;

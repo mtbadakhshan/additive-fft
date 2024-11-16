@@ -55,17 +55,14 @@ PreComputedValues_Level2<FieldT> pre_computation_lvl2(const libiop::affine_subsp
     for (size_t j = 0; j < m; ++j)
     {
         FieldT beta = values_lvl1.mult_factor_vec[j];
-        std::vector<FieldT> betai_vec(1ull<<m, FieldT::zero());
+        std::vector<FieldT> betai_vec((1ull<<(m-j))-1);
+
         FieldT betai(1);
 
-        for (size_t ofs = 0; ofs < (1ull<<m); ofs += (1ull<<j))
+        for (size_t k = 0; k < (1ull<<(m-j))-1; k++)
         {
-            for (size_t p = 0; p < (1ull<<j); ++p)
-            {
-                betai_vec[ofs + p] = betai;
-            }
-
             betai *= beta;
+            betai_vec[k] = betai;
         }
         values.betai_vec.emplace_back(betai_vec);
 
@@ -115,8 +112,15 @@ std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
     for (size_t j = 0; j < m; ++j)
     {
 
-        for (size_t i = (1ull<<j); i < n; ++i){
-            S[i] *= values.betai_vec[j][i];
+        size_t k = 0;
+        for (size_t ofs = (1ull<<j); ofs < n; ofs += (1ull<<j))
+        {
+            FieldT betai = values.betai_vec[j][k++];
+            for (size_t p = 0; p < (1ull<<j); ++p)
+            {
+                S[ofs + p] *= betai;
+            }
+
         }
 
         /* perform radix conversion */

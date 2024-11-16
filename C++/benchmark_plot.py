@@ -62,7 +62,7 @@ if __name__ == "__main__":
     output_file = "build/benchmark_output.json"
     min_range = 2
     max_range = 23
-    benchmark_repetitions = 1000
+    benchmark_repetitions = 200
     # Run the benchmark if the output file does not exist
     if not os.path.exists(output_file):
         run_benchmark(min_range, max_range, benchmark_repetitions, output_file)

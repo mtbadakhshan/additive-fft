@@ -1,6 +1,13 @@
-# additive-fft
+# Additive-FFT
 Additive Fast Fourier Transforms over Finite Fields
 
+## Overview
+
+This repository contains both SageMath and C++ implementations related to Cantor and Gao-Mateer algorithms. The C++ implementation relies on the `libff` library, which is included as a Git submodule, so there's no need for a separate installation of `libff`. For the SageMath implementation, only Sage is required.
+
+
+
+<!-- 
 ## To-do:
 1. Implement Gao's general algorithm using Cantor's basis.
 1. Implement Gao's special case algorithm
@@ -43,4 +50,4 @@ Additive Fast Fourier Transforms over Finite Fields
 - Average Cantor's FFT time (excludes pre-computation): 0.03471111297607422 s
 - Average Cantor's FFT time (excludes pre-computation - parallel mode): 0.03284716844558716 s
 - Average Cantor's FFT time (includes pre-computation - parallel mode): 0.04717706918716431 s
-
+ -->
