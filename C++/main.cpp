@@ -206,15 +206,47 @@ void Valgrid_libiop_test(){
     const std::vector<FieldT> gao_result = libiop::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
 }
 
+void Valgrid_cantor_test(){
+    typedef libff::gf256 FieldT;
+    size_t m = 10;
+    std::cout << "m = " << m << ", Start testing!\n";
+
+    //Cantor Special Basis Domain Creation
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+    
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+
+    const std::vector<FieldT> cantor_result = cantor::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
+}
+
+
+void Valgrid_cantorPC_test(){
+    typedef libff::gf256 FieldT;
+    size_t m = 4;
+    std::cout << "m = " << m << ", Start testing!\n";
+
+    //Cantor Special Basis Domain Creation
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+
+    cantor::PreComputedValues<FieldT> values = cantor::pre_computation(domain.subspace());
+    const std::vector<FieldT> cantor_result = cantor::additive_FFT<FieldT>(poly_coeffs, values);
+}
+
+
 int main()
 {
     
     // Cantor_FFT_Test();
-    Gao_CO_FFT_Test();
+    // Gao_CO_FFT_Test();
     // Cantor_FFT_PreComputation_Test();
     // Gao_FFT_PreComputation_Test();
 
-    Valgrid_libiop_test();
+    // Valgrid_libiop_test();
+    Valgrid_cantorPC_test();
 
     return 0;
 }
