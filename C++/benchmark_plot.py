@@ -5,9 +5,10 @@ import os
 import csv
 
 # Build and run the benchmark (assuming the build directory is './build' and cmake is configured)
-def run_benchmark(min_range, max_range, benchmark_repetitions, output_file="benchmark_output.json"):
+def run_benchmark(min_range, max_range, step, benchmark_repetitions, output_file="benchmark_output.json"):
     os.environ['BM_MIN_RANGE'] = str(min_range)
     os.environ['BM_MAX_RANGE'] = str(max_range)
+    os.environ['BM_STEP'] = str(step)
     # Command to run the benchmark and output results to JSON format
     benchmark_command = [
         "./build/run_benchmark",  # Replace with your actual executable name
@@ -71,17 +72,19 @@ def plot_benchmark_results(results):
 
 # Main script execution
 if __name__ == "__main__":
-    output_file = "../data_backup/benchmark_output.json" #"build/benchmark_output.json"
-    min_range = 2
-    max_range = 23
-    benchmark_repetitions = 1000
+    output_root = "build/"
+    output_file =  output_root + "benchmark_output.json" #"../data_backup/benchmark_output.json"
+    min_range = 5
+    max_range = 20
+    step = 5
+    benchmark_repetitions = 100
     # Run the benchmark if the output file does not exist
-    # if not os.path.exists(output_file):
-    #     run_benchmark(min_range, max_range, benchmark_repetitions, output_file)
+    if not os.path.exists(output_file):
+        run_benchmark(min_range, max_range, step, benchmark_repetitions, output_file)
     
     # Parse the benchmark output
     benchmark_results = parse_benchmark_output(output_file)
-    write_to_csv_per_algorithm(benchmark_results, "../data_backup/")
+    write_to_csv_per_algorithm(benchmark_results, output_root)
     
     # Plot the results
     plot_benchmark_results(benchmark_results)

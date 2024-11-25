@@ -167,15 +167,16 @@ static void BM_cantor_additive_fft_precmp(benchmark::State &state)
 
 const int MIN_RANGE = std::stoi(std::getenv("BM_MIN_RANGE"));
 const int MAX_RANGE = std::stoi(std::getenv("BM_MAX_RANGE"));
+const int STEP = std::stoi(std::getenv("BM_STEP"));
 
-// BENCHMARK(BM_libiop_naive_fft)->DenseRange(MIN_RANGE, 15)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-// BENCHMARK(BM_libiop_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-// BENCHMARK(BM_gao_additive_fft_lvl1)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-// BENCHMARK(BM_gao_additive_fft_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-// BENCHMARK(BM_gao_additive_fft_co)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_gao_additive_fft_co_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft_precmp)->DenseRange(MIN_RANGE, MAX_RANGE)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_libiop_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_gao_additive_fft_lvl1)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_gao_additive_fft_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_gao_additive_fft_co)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_gao_additive_fft_co_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_cantor_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_cantor_additive_fft_precmp)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_libiop_naive_fft)->DenseRange(MIN_RANGE, 10, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 
 
 BENCHMARK_MAIN();
