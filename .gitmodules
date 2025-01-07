@@ -4,3 +4,6 @@
 [submodule "C++/depends/benchmark"]
 	path = C++/depends/benchmark
 	url = https://github.com/google/benchmark.git
+[submodule "C/bitpolymul"]
+	path = C/bitpolymul
+	url = https://github.com/mtbadakhshan/bitpolymul
