@@ -17,6 +17,6 @@ void my_print_vector(const std::vector<T> &v);
 template <typename FieldT>
 FieldT divide(std::vector<FieldT> &g, const std::vector<size_t> &nz_S, const size_t input_size, const size_t offset); 
 
-#include "utils/utils.tcc"
+#include "utils.tcc"
 
 #endif // ADDITIVE_FFT_UTILS_HPP_

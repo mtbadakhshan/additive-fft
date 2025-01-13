@@ -1,4 +1,3 @@
-#include <utils/utils.hpp>
 
 template <typename FieldT>
 bool field_trace_binary(const FieldT &element)

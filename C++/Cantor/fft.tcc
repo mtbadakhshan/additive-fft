@@ -1,9 +1,6 @@
-#include <Cantor/fft.hpp>
-#include <cstddef>
 #include <libff/algebra/field_utils/algorithms.hpp>
 
-#include <iostream>
-#include "utils/utils.hpp"
+#include "../utils/utils.hpp"
 
 
 namespace cantor {

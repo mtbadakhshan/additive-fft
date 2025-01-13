@@ -1,11 +1,8 @@
 #ifndef ADDITIVE_FFT_CANTOR_HPP_
 #define ADDITIVE_FFT_CANTOR_HPP_
 
-#include <cstddef>
 #include <vector>
 
-#include "libiop/algebra/field_subset.hpp"
-#include "libiop/algebra/subspace.hpp"
 
 namespace cantor {
 
@@ -43,5 +40,5 @@ std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &evals,
 
 } // namespace cantor
 
-#include "Cantor/fft.tcc"
+#include "fft.tcc"
 #endif // ADDITIVE_FFT_CANTOR_HPP_
