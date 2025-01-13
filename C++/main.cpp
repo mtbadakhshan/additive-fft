@@ -223,7 +223,7 @@ void Valgrid_cantor_test(){
 
 void Valgrid_cantorPC_test(){
     typedef libff::gf256 FieldT;
-    size_t m = 4;
+    size_t m = 15;
     std::cout << "m = " << m << ", Start testing!\n";
 
     //Cantor Special Basis Domain Creation
@@ -231,9 +231,14 @@ void Valgrid_cantorPC_test(){
     libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
 
     std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
-
     cantor::PreComputedValues<FieldT> values = cantor::pre_computation(domain.subspace());
+
     const std::vector<FieldT> cantor_result = cantor::additive_FFT<FieldT>(poly_coeffs, values);
+    const std::vector<FieldT> poly_coeffs_computed = cantor::additive_IFFT<FieldT>(cantor_result, values);
+
+    std::cout << "Equality check: " << (check_equal<FieldT>(poly_coeffs_computed, poly_coeffs) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
+
+
 }
 
 
@@ -260,14 +265,14 @@ void Pre_Compute_Cantor_basis(){
 
 int main()
 {
-    Pre_Compute_Cantor_basis();
+    // Pre_Compute_Cantor_basis();
     // Cantor_FFT_Test();
     // Gao_CO_FFT_Test();
     // Cantor_FFT_PreComputation_Test();
     // Gao_FFT_PreComputation_Test();
 
     // Valgrid_libiop_test();
-    // Valgrid_cantorPC_test();
+    Valgrid_cantorPC_test();
 
     return 0;
 }

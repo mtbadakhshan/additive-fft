@@ -26,11 +26,19 @@ template<typename FieldT>
 PreComputedValues<FieldT> pre_computation(const libiop::affine_subspace<FieldT> &domain);
 
 template<typename FieldT>
-std::vector<FieldT> cantor_additive_FFT(const std::vector<FieldT> &poly_coeffs,
+std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
                                         const PreComputedValues<FieldT> &values);
 
 template<typename FieldT>
-std::vector<FieldT> cantor_additive_FFT(const std::vector<FieldT> &poly_coeffs,
+std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &poly_coeffs,
+                                        const PreComputedValues<FieldT> &values);
+
+template<typename FieldT>
+std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
+                                        const libiop::affine_subspace<FieldT> &domain);
+
+template<typename FieldT>
+std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &evals,
                                         const libiop::affine_subspace<FieldT> &domain);
 
 } // namespace cantor
