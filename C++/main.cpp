@@ -237,16 +237,37 @@ void Valgrid_cantorPC_test(){
 }
 
 
+void Pre_Compute_Cantor_basis(){
+    typedef libff::gf64 FieldT;
+
+    std::vector<FieldT> basis = cantor_basis<FieldT>(32);
+    my_print_vector(basis);
+
+    int N = 32;
+    std::cout <<"cantor_in_gf"<<FieldT::extension_degree()<<"["<<N<<"]["<<FieldT::extension_degree()/64<<"] = {\n"; 
+    for (int i = 0; i < N; i++){
+        std::vector<uint64_t> basis_in_words = basis[i].to_words();
+    std::cout <<"{ "; 
+        for (int j = 0; j < basis_in_words.size() - 1; j++){
+            std::cout<< basis_in_words[j] << ", ";
+        }
+        std::cout<< basis_in_words.back() << " }, \n";
+    }
+    std::cout <<"};\n"; 
+
+
+}
+
 int main()
 {
-    
+    Pre_Compute_Cantor_basis();
     // Cantor_FFT_Test();
     // Gao_CO_FFT_Test();
     // Cantor_FFT_PreComputation_Test();
     // Gao_FFT_PreComputation_Test();
 
     // Valgrid_libiop_test();
-    Valgrid_cantorPC_test();
+    // Valgrid_cantorPC_test();
 
     return 0;
 }

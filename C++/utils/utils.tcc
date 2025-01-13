@@ -10,7 +10,7 @@ bool field_trace_binary(const FieldT &element)
         element_squared = element_squared.squared();
         trace += element_squared;
     }
-    return !trace.is_zero();
+    return !trace.is_zero(); // === is one
 }
 
 template <typename FieldT>

@@ -14,7 +14,7 @@ UTILS_DIR = utils
 UTILS_SRC = $(wildcard $(UTILS_DIR)/*.c)
 UTILS_OBJ = $(UTILS_SRC:.c=.o)
 
-TARGET  = main
+TARGET  = main.out
 
 .PHONY: all clean
 

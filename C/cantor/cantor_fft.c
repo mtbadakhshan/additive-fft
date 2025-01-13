@@ -26,45 +26,43 @@ __m128i* cantor_fft_gf2128(__m128i* fx, unsigned n_term){
     __m256i* poly256;
     // unsigned nz_S[15];
     const unsigned* nz_S;
-    for (unsigned r = 0; r < m; ++r){
+    for (unsigned r = 0; r < m-1; ++r){
         // Computing S_i
         S_index--; 
-        // t=0;
-        // if (S_index > 0){
-        //     nz_S[t] = (1<<S_index) - 1; t++;
-        //     for ( unsigned i = 1; i < S_index; ++i){
-        //         ii = i; rr = S_index;
-        //         while (((rr & 1) | (~ii & 1)) && ii>0) {ii >>= 1; rr >>= 1;}
-        //         if (ii == 0) {nz_S[t] = (1<<S_index) - (1<<i); t++;}
-        //     }
-        // }
-
         nz_S = s_i[S_index]; t=n_terms[S_index];
-
-        // printf("{%u", nz_S[0]); for(unsigned i = 1; i < t; ++i) printf(", %u", nz_S[i]); printf("}\t\t\t\t\t \\\\S_%u\n", S_index);
-
         offset = 0;
         half_input_size = input_size >> 1;
         half_half_input_size = half_input_size>>1;
         for (unsigned module = 0; module < n_modules; ++module){
-            mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module << 1);
+            mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
             offset2 = offset + half_input_size;
             for (unsigned k = offset2 + half_input_size - 1; k >= offset2; --k){
                 poly_k = poly[k];
                 for (unsigned i = 0; i < t; ++i){
                     poly[k - nz_S[i]] ^= poly_k;
                 }
-                poly[k-half_input_size] ^= _gf2ext128_mul_sse(poly_k, mult_factor);
+                // poly[k-half_input_size] ^= _gf2ext128_mul_sse(poly_k, mult_factor);
             }
-            j = 0;
             poly256 =(__m256i*) (poly+offset);
-            for (; j < half_half_input_size; ++j) poly256[j + half_half_input_size] ^= poly256[j];
-            j*=2;
-            for (; j < half_input_size; ++j) poly[offset2+j] ^= poly[offset+j];            
+            for (j = 0; j < half_half_input_size; ++j) { // we use half_half_input_size since the steps are 256-bits 
+                poly256[j + half_half_input_size] = poly256[j] ^= _gf2ext128_mul_2x1_avx2( poly256[j + half_half_input_size] , mult_factor );
+                // poly256[j + half_half_input_size] ^= poly256[j];  
+            }      
             offset += input_size;
         }
         input_size = half_input_size;
         n_modules <<= 1;
     }
+    
+    offset = 0;
+    // r = m (last layer)
+    for (unsigned module = 0; module < n_modules; ++module){
+        mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
+        offset2 = offset + half_input_size;
+        poly[offset] ^= _gf2ext128_mul_sse(poly[offset+1], mult_factor);
+        poly[offset+1] ^= poly[offset];            
+        offset += 2;
+    }
+
     return poly;
 }

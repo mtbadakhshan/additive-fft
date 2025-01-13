@@ -25,7 +25,7 @@ void test_bitpolymul_lch(){
 }
 
 void test_cantor(){
-    unsigned m = 15; // degree n = 2^m
+    unsigned m = 10; // degree n = 2^m
 	unsigned n = (1ULL) << m; // n is even and it must be even for keeping the 32 byte
     printf("m = %u, n = %u\n", m, n);
     // Generating the random polynomial in GF_2^128
