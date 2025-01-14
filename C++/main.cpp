@@ -243,12 +243,10 @@ void Valgrid_cantorPC_test(){
 
 
 void Pre_Compute_Cantor_basis(){
-    typedef libff::gf64 FieldT;
-
-    std::vector<FieldT> basis = cantor_basis<FieldT>(32);
-    my_print_vector(basis);
-
+    typedef libff::gf192 FieldT;
     int N = 32;
+
+    std::vector<FieldT> basis = cantor_basis<FieldT>(N);
     std::cout <<"cantor_in_gf"<<FieldT::extension_degree()<<"["<<N<<"]["<<FieldT::extension_degree()/64<<"] = {\n"; 
     for (int i = 0; i < N; i++){
         std::vector<uint64_t> basis_in_words = basis[i].to_words();
@@ -265,14 +263,14 @@ void Pre_Compute_Cantor_basis(){
 
 int main()
 {
-    // Pre_Compute_Cantor_basis();
+    Pre_Compute_Cantor_basis();
     // Cantor_FFT_Test();
     // Gao_CO_FFT_Test();
     // Cantor_FFT_PreComputation_Test();
     // Gao_FFT_PreComputation_Test();
 
     // Valgrid_libiop_test();
-    Valgrid_cantorPC_test();
+    // Valgrid_cantorPC_test();
 
     return 0;
 }
