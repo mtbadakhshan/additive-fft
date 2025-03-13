@@ -38,7 +38,8 @@ __m128i* cantor_fft_gf2128(__m128i* fx, unsigned n_term){
             offset2 = offset + half_input_size;
             for (unsigned k = offset2 + half_input_size - 1; k >= offset2; --k){
                 poly_k = poly[k];
-                for (unsigned i = 0; i < t; ++i){
+                poly[k - half_input_size + 1] ^= poly_k;
+                for (unsigned i = 1; i < t; ++i){
                     poly[k - nz_S[i]] ^= poly_k;
                 }
                 poly[k-half_input_size] ^= _gf2ext128_mul_sse(poly_k, mult_factor);
@@ -83,7 +84,54 @@ __m128i* cantor_fft_hc_circuits_gf2128(__m128i* fx, unsigned n_term){
     __m256i* poly256;
     // unsigned nz_S[15];
     const unsigned* nz_S;
-    for (unsigned r = 0; r < m-5; ++r){
+    for (unsigned r = 0; r < m-9; ++r){
+        // Computing S_i
+        S_index--; 
+        nz_S = s_i[S_index]; t=n_terms[S_index];
+        offset = 0;
+        half_input_size = input_size >> 1;
+        half_half_input_size = half_input_size>>1;
+        for (unsigned module = 0; module < n_modules; ++module){
+            mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
+            offset2 = offset + half_input_size;
+            for (unsigned k = offset2 + half_input_size - 1; k >= offset2; --k){
+                poly_k = poly[k];
+                poly[k - half_input_size + 1] ^= poly_k;
+                for (unsigned i = 1; i < t; ++i){
+                    poly[k - nz_S[i]] ^= poly_k;
+                }
+                poly[k-half_input_size] ^= _gf2ext128_mul_sse(poly_k, mult_factor);
+            }
+            poly256 =(__m256i*) (poly+offset);
+            for (j = 0; j < half_half_input_size; ++j) { // we use half_half_input_size since the steps are 256-bits 
+                // poly256[j + half_half_input_size] = poly256[j] ^= _gf2ext128_mul_2x1_avx2( poly256[j + half_half_input_size] , mult_factor );
+                poly256[j + half_half_input_size] ^= poly256[j];  
+            }      
+            offset += input_size;
+        }
+        input_size = half_input_size;
+        n_modules <<= 1;
+    }
+
+    // r = m-9 (S_8) (input_size = 256)
+    offset = 0;
+    half_input_size = input_size >> 1;
+        // Computing S_i
+    poly_offset = (__m128i*) (poly + offset); 
+        for (unsigned module = 0; module < n_modules; ++module){
+            mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
+            poly_offset = (__m128i*) (poly + offset); 
+            DIV_S8(mult_factor);
+            offset += input_size;
+
+        }
+        
+
+    //   
+    input_size = half_input_size;
+    n_modules <<= 1;
+    S_index = 8; 
+    for (unsigned r = m-8; r < m-5; ++r){
         // Computing S_i
         S_index--; 
         nz_S = s_i[S_index]; t=n_terms[S_index];
@@ -110,52 +158,57 @@ __m128i* cantor_fft_hc_circuits_gf2128(__m128i* fx, unsigned n_term){
         input_size = half_input_size;
         n_modules <<= 1;
     }
+    
 
-    // r = m-4 (S_4) (input_size = 32)
+    // r = m-5 (S_4) (input_size = 32)
     offset = 0;
     half_input_size = input_size >> 1;
     for (unsigned module = 0; module < n_modules; ++module){    
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
-        poly_offset = (__m128i*) (poly + offset);  
+        poly_offset = (__m128i*) (poly + offset); 
+        // poly256 = (__m256i*) (poly_offset);                   
         DIV_S4(mult_factor);
         offset += 32;
     }
     n_modules <<= 1;
 
-    // r = m-3 (S_3) (input_size = 16)
+    // r = m-4 (S_3) (input_size = 16)
     offset = 0;
     half_input_size = input_size >> 1;
     for (unsigned module = 0; module < n_modules; ++module){    
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
         poly_offset = (__m128i*) (poly + offset);  
+        // poly256 = (__m256i*) (poly_offset);                  
         DIV_S3(mult_factor);
         offset += 16;
     }
     n_modules <<= 1;
 
-    // r = m-2 (S_2) (input_size = 8)
+    // r = m-3 (S_2) (input_size = 8)
     offset = 0;
     half_input_size = input_size >> 1;
     for (unsigned module = 0; module < n_modules; ++module){    
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
         poly_offset = (__m128i*) (poly + offset);  
+        // poly256 = (__m256i*) (poly_offset);                  
         DIV_S2(mult_factor);
         offset += 8;
     }
     n_modules <<= 1;
 
-    // r = m-1 (S_1) (input_size = 4)
+    // r = m-2 (S_1) (input_size = 4)
     offset = 0;
     half_input_size = input_size >> 1;
     for (unsigned module = 0; module < n_modules; ++module){    
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
-        poly_offset = (__m128i*) (poly + offset);                       
+        poly_offset = (__m128i*) (poly + offset);       
+        // poly256 = (__m256i*) (poly_offset);                  
         DIV_S1(mult_factor);
         offset += 4;
     }
     n_modules <<= 1;
 
-    // r = m (last layer) (S_0)
+    // r = m-1 (last layer) (S_0)
     offset = 0;
     for (unsigned module = 0; module < n_modules; ++module){    
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
@@ -166,7 +219,6 @@ __m128i* cantor_fft_hc_circuits_gf2128(__m128i* fx, unsigned n_term){
 
     return poly;
 }
-
 
 
 __m128i* cantor_fft_hc_cache_gf2128(__m128i* fx, unsigned n_term){
@@ -182,7 +234,6 @@ __m128i* cantor_fft_hc_cache_gf2128(__m128i* fx, unsigned n_term){
     __m128i mult_factor, poly_k;
     __m128i* poly_offset;
     __m256i* poly256;
-    // unsigned nz_S[15];
     const unsigned* nz_S;
     for (unsigned r = 0; r < m-5; ++r){
         // Computing S_i
@@ -212,12 +263,15 @@ __m128i* cantor_fft_hc_cache_gf2128(__m128i* fx, unsigned n_term){
         n_modules <<= 1;
     }
 
+
+
     // r = m-4 (S_4) (input_size = 32)
     offset = 0;
     half_input_size = input_size >> 1;
     for (unsigned module = 0; module < n_modules; ++module){    
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
         poly_offset = (__m128i*) (poly + offset);  
+        // poly256 = (__m256i*) (poly_offset);                  
         DIV_S4(mult_factor);
         offset += 32;
     }
@@ -229,6 +283,7 @@ __m128i* cantor_fft_hc_cache_gf2128(__m128i* fx, unsigned n_term){
     for (unsigned module = 0; module < n_modules; ++module){    
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
         poly_offset = (__m128i*) (poly + offset);  
+        // poly256 = (__m256i*) (poly_offset);                  
         DIV_S3(mult_factor);
         offset += 16;
     }
@@ -240,6 +295,7 @@ __m128i* cantor_fft_hc_cache_gf2128(__m128i* fx, unsigned n_term){
     for (unsigned module = 0; module < n_modules; ++module){    
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
         poly_offset = (__m128i*) (poly + offset);  
+        // poly256 = (__m256i*) (poly_offset);                  
         DIV_S2(mult_factor);
         offset += 8;
     }
@@ -249,36 +305,18 @@ __m128i* cantor_fft_hc_cache_gf2128(__m128i* fx, unsigned n_term){
     offset = 0;
     half_input_size = input_size >> 1;
     for (unsigned module = 0; module < n_modules; ++module){    
-        // unsigned module_2 = module<<1;
-        // unsigned module_4 = module<<2;
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
-        poly_offset = (__m128i*) (poly + offset);                       
+        poly_offset = (__m128i*) (poly + offset); 
+        // poly256 = (__m256i*) (poly_offset);                 
         DIV_S1(mult_factor);
         
         mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<2);
         DIV_S0(mult_factor); 
         poly_offset += 2;                       
-        // xmm_dump(&mult_factor, 1);
-        // mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, (module<<2)+2);
         mult_factor ^= _mm_load_si128((const __m128i*) gfCantorto2128_8R + 2);
-        // xmm_dump(&mult_factor, 1);
-        // printf("\n");
-        // printf("\n");
-
-        // mult_factor ^= _mm_set_epi32(0, 0, 0, 1);
         DIV_S0(mult_factor); 
         offset += 4;
     }
-    // n_modules <<= 1;
-
-    // r = m (last layer) (S_0)
-    // offset = 0;
-    // for (unsigned module = 0; module < n_modules; ++module){    
-    //     mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
-    //     poly_offset = (__m128i*) (poly + offset);                       
-    //     DIV_S0(mult_factor); 
-    //     offset += 2;
-    // }
 
     return poly;
 }

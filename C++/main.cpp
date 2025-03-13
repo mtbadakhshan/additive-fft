@@ -261,9 +261,28 @@ void Pre_Compute_Cantor_basis(){
 
 }
 
+#include "Cantor/cantor_basis.hpp"
+void check_the_basis_element_order(){
+    typedef libff::gf128 FieldT_128;
+    int N = 32;
+    
+    for (int i = 0; i < N; ++i){
+        FieldT_128 element = FieldT_128(cantor::cantor_in_gf2to128[i][1], cantor::cantor_in_gf2to128[i][0]);
+        std::cout << "e = " << element << " | ";
+        std::cout << "e^2 = "  << (element^2) << " | ";
+        std::cout << "e^3 = "  << (element^3) << " | ";
+        std::cout << "e^4 = "  << (element^4) << " | ";
+        std::cout << "e^5 = "  << (element^2) << std::endl;
+
+
+
+
+    }
+}
+
 int main()
 {
-    Pre_Compute_Cantor_basis();
+    // Pre_Compute_Cantor_basis();
     // Cantor_FFT_Test();
     // Gao_CO_FFT_Test();
     // Cantor_FFT_PreComputation_Test();
@@ -271,6 +290,7 @@ int main()
 
     // Valgrid_libiop_test();
     // Valgrid_cantorPC_test();
+    check_the_basis_element_order();
 
     return 0;
 }
