@@ -71,7 +71,7 @@ __m128i* cantor_fft_gf2128(__m128i* fx, unsigned n_term){
 }
 
 
-void cantor_fft_gf2128_parallel_task(__m128i* poly, unsigned S_index, unsigned module){
+void cantor_fft_gf2128_parallel_task(__m128i* poly, unsigned S_index, unsigned module, unsigned cutoff){
 
     if(S_index==1){
         // r = m (last layer)
@@ -107,18 +107,18 @@ void cantor_fft_gf2128_parallel_task(__m128i* poly, unsigned S_index, unsigned m
             poly256[j + half_half_input_size] ^= poly256[j];  
         }      
         
-        if (S_index > 17) {
+        if (S_index > cutoff) {
             #pragma omp task 
-            cantor_fft_gf2128_parallel_task(poly, S_index, module << 1);
+            cantor_fft_gf2128_parallel_task(poly, S_index, module << 1, cutoff);
         
             #pragma omp task 
-            cantor_fft_gf2128_parallel_task(poly + half_input_size, S_index, (module << 1) + 1);
+            cantor_fft_gf2128_parallel_task(poly + half_input_size, S_index, (module << 1) + 1, cutoff);
         
             #pragma omp taskwait
         } else {
             // Serial execution to avoid too many small tasks
-            cantor_fft_gf2128_parallel_task(poly, S_index, module << 1);
-            cantor_fft_gf2128_parallel_task(poly + half_input_size, S_index, (module << 1) + 1);
+            cantor_fft_gf2128_parallel_task(poly, S_index, module << 1, cutoff);
+            cantor_fft_gf2128_parallel_task(poly + half_input_size, S_index, (module << 1) + 1, cutoff);
         }
     // } 
 }
@@ -131,18 +131,18 @@ __m128i* cantor_fft_gf2128_parallel(__m128i* fx, unsigned n_term){
     poly = memcpy( poly, fx, sizeof(__m128i)*n_term );
     #endif
     unsigned m = LOG2(n_term);
-    unsigned S_index = m, input_size = n_term, n_modules = 1;
-    unsigned j, t, offset, offset2, half_input_size, half_half_input_size;
-    __m128i mult_factor, poly_k;
-    __m256i* poly256;
-    // unsigned nz_S[15];
-    const unsigned* nz_S;
+    // unsigned S_index = m, input_size = n_term, n_modules = 1;
+    // unsigned j, t, offset, offset2, half_input_size, half_half_input_size;
+    // __m128i mult_factor, poly_k;
+    // __m256i* poly256;
+    // // unsigned nz_S[15];
+    // const unsigned* nz_S;
     
     #pragma omp parallel
     {
         #pragma omp single
         {
-            cantor_fft_gf2128_parallel_task(poly, m, 0);
+            cantor_fft_gf2128_parallel_task(poly, m, 0, m-1);
         }       
     }
     return poly;
