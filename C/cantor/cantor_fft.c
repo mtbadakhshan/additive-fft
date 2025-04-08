@@ -83,7 +83,7 @@ void cantor_fft_gf2128_parallel_task(__m128i* poly, unsigned S_index, unsigned m
 
     __m128i mult_factor, poly_k;
     __m256i* poly256;
-    unsigned m = S_index, input_size = (1<<S_index), n_modules = 1;
+    unsigned input_size = (1<<S_index);
     unsigned j, t, offset, offset2, half_input_size, half_half_input_size;
 
         S_index--; 
@@ -114,7 +114,7 @@ void cantor_fft_gf2128_parallel_task(__m128i* poly, unsigned S_index, unsigned m
             #pragma omp task 
             cantor_fft_gf2128_parallel_task(poly + half_input_size, S_index, (module << 1) + 1, cutoff);
         
-            #pragma omp taskwait
+            // #pragma omp taskwait
         } else {
             // Serial execution to avoid too many small tasks
             cantor_fft_gf2128_parallel_task(poly, S_index, module << 1, cutoff);
@@ -131,17 +131,12 @@ __m128i* cantor_fft_gf2128_parallel(__m128i* fx, unsigned n_term){
     poly = memcpy( poly, fx, sizeof(__m128i)*n_term );
     #endif
     unsigned m = LOG2(n_term);
-    // unsigned S_index = m, input_size = n_term, n_modules = 1;
-    // unsigned j, t, offset, offset2, half_input_size, half_half_input_size;
-    // __m128i mult_factor, poly_k;
-    // __m256i* poly256;
-    // // unsigned nz_S[15];
-    // const unsigned* nz_S;
     
     #pragma omp parallel
     {
         #pragma omp single
         {
+            // printf("Thread %d says hello\n", omp_get_thread_num());
             cantor_fft_gf2128_parallel_task(poly, m, 0, m-1);
         }       
     }

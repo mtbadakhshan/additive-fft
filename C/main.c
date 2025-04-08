@@ -48,10 +48,10 @@ void test_cantor_parallel(){
     printf("are equal = %b\n", are_equal_vec_128bit(evals, evals3, n));
 }
 
-#define ITERATIONS 100
+#define ITERATIONS 1
 void cantor_vs_lch(){
     printf("m\tCantor\t\tCantor HC\tCantor PARALLEL\tLCH\n");
-    for (unsigned m = 9; m < 21; m++){
+    for (unsigned m = 9; m < 22; m++){
 	    unsigned n = (1ULL) << m; 
         clock_t start, end;
         double time_cantor = 0, time_cantor_hc = 0, time_lch = 0, time_cantor_hc_cache=0;
@@ -107,6 +107,6 @@ int main(){
     // test_bitpolymul_lch();
     // test_cantor();
     cantor_vs_lch();
-    test_cantor_parallel();
+    // test_cantor_parallel();
     return 0;
 }
