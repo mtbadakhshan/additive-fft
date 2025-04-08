@@ -8,6 +8,8 @@
 #include "bitpolymul/gf2128_cantor_iso.h"
 #include "bitpolymul/gfext_aesni.h"
 
+#include <omp.h>
+
 
 
 #define LOG2(X) ((unsigned) (8*sizeof (unsigned long long) - __builtin_clzll((X)) - 1))
@@ -16,7 +18,7 @@ __m128i* cantor_fft_gf2128(__m128i* fx, unsigned n_term){
     #ifdef NCOPY_POLY //For small polynomials copy to a new array to keep the input values unchanged
     __m128i* poly = fx;
     #else
-    __m128i* poly = (__m128i*)aligned_alloc( 32 , sizeof(__m128i)*n_term );
+    __m128i* poly = (__m128i*)aligned_alloc( 64 , sizeof(__m128i)*n_term );
     poly = memcpy( poly, fx, sizeof(__m128i)*n_term );
     #endif
     unsigned m = LOG2(n_term);
@@ -67,6 +69,85 @@ __m128i* cantor_fft_gf2128(__m128i* fx, unsigned n_term){
 
     return poly;
 }
+
+
+void cantor_fft_gf2128_parallel_task(__m128i* poly, unsigned S_index, unsigned module){
+
+    if(S_index==1){
+        // r = m (last layer)
+        __m128i mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, (module)<<1);
+        poly[0] ^= _gf2ext128_mul_sse(poly[1], mult_factor);
+        poly[1] ^= poly[0];            
+        return;
+    }
+
+    __m128i mult_factor, poly_k;
+    __m256i* poly256;
+    unsigned m = S_index, input_size = (1<<S_index), n_modules = 1;
+    unsigned j, t, offset, offset2, half_input_size, half_half_input_size;
+
+        S_index--; 
+        const unsigned* nz_S = s_i[S_index]; t=n_terms[S_index];
+        offset = 0;
+        half_input_size = input_size >> 1;
+        
+        half_half_input_size = half_input_size>>1;
+        mult_factor = bitmat_prod_accu_64x128_M8R_sse(_mm_setzero_si128(),  gfCantorto2128_8R, module<<1);
+        offset2 = offset + half_input_size;
+        for (unsigned k = offset2 + half_input_size - 1; k >= offset2; --k){
+            poly_k = poly[k];
+            poly[k - half_input_size + 1] ^= poly_k;
+            for (unsigned i = 1; i < t; ++i){
+                poly[k - nz_S[i]] ^= poly_k;
+            }
+            poly[k-half_input_size] ^= _gf2ext128_mul_sse(poly_k, mult_factor);
+        }
+        poly256 =(__m256i*) (poly+offset);
+        for (j = 0; j < half_half_input_size; ++j) { // we use half_half_input_size since the steps are 256-bits 
+            poly256[j + half_half_input_size] ^= poly256[j];  
+        }      
+        
+        if (S_index > 17) {
+            #pragma omp task 
+            cantor_fft_gf2128_parallel_task(poly, S_index, module << 1);
+        
+            #pragma omp task 
+            cantor_fft_gf2128_parallel_task(poly + half_input_size, S_index, (module << 1) + 1);
+        
+            #pragma omp taskwait
+        } else {
+            // Serial execution to avoid too many small tasks
+            cantor_fft_gf2128_parallel_task(poly, S_index, module << 1);
+            cantor_fft_gf2128_parallel_task(poly + half_input_size, S_index, (module << 1) + 1);
+        }
+    // } 
+}
+
+__m128i* cantor_fft_gf2128_parallel(__m128i* fx, unsigned n_term){
+    #ifdef NCOPY_POLY //For small polynomials copy to a new array to keep the input values unchanged
+    __m128i* poly = fx;
+    #else
+    __m128i* poly = (__m128i*)aligned_alloc( 64 , sizeof(__m128i)*n_term );
+    poly = memcpy( poly, fx, sizeof(__m128i)*n_term );
+    #endif
+    unsigned m = LOG2(n_term);
+    unsigned S_index = m, input_size = n_term, n_modules = 1;
+    unsigned j, t, offset, offset2, half_input_size, half_half_input_size;
+    __m128i mult_factor, poly_k;
+    __m256i* poly256;
+    // unsigned nz_S[15];
+    const unsigned* nz_S;
+    
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            cantor_fft_gf2128_parallel_task(poly, m, 0);
+        }       
+    }
+    return poly;
+}
+
 
 #include "div_by_s_i.h"
 __m128i* cantor_fft_hc_circuits_gf2128(__m128i* fx, unsigned n_term){

@@ -36,9 +36,21 @@ void test_cantor(){
     printf("are equal = %b\n", are_equal_vec_128bit(evals, evals3, n));
 }
 
+void test_cantor_parallel(){
+    unsigned m = 15; // degree n = 2^m
+	unsigned n = (1ULL) << m; // n is even and it must be even for keeping the 32 byte
+    printf("m = %u, n = %u\n", m, n);
+    // Generating the random polynomial in GF_2^128
+	__m128i* fx = random_polynomial_gf2128(n);
+    __m128i* evals = cantor_fft_gf2128(fx, n);
+    __m128i* evals3 = cantor_fft_gf2128_parallel(fx, n);
+    // __m128i* evals2 = naive_evaluate(fx, n);
+    printf("are equal = %b\n", are_equal_vec_128bit(evals, evals3, n));
+}
+
 #define ITERATIONS 50
 void cantor_vs_lch(){
-    printf("m\tCantor\t\tCantor HC\tCantor CACHE\tLCH\n");
+    printf("m\tCantor\t\tCantor HC\tCantor PARALLEL\tLCH\n");
     for (unsigned m = 9; m < 21; m++){
 	    unsigned n = (1ULL) << m; 
         clock_t start, end;
@@ -57,7 +69,7 @@ void cantor_vs_lch(){
         for (unsigned iter = 0; iter < ITERATIONS; ++iter){
             __m128i* fx1 = random_polynomial_gf2128(n);
             start = clock();
-            __m128i* evals = cantor_fft_hc_cache_gf2128(fx1, n);
+            __m128i* evals = cantor_fft_gf2128_parallel(fx1, n);
             end = clock();
             time_cantor_hc_cache += 1000 * ((double) (end - start)) / CLOCKS_PER_SEC;
             free(fx1);
@@ -93,7 +105,8 @@ int main(){
     srand(time(NULL));
     // validate_cantor_basis();
     // test_bitpolymul_lch();
-    test_cantor();
+    // test_cantor();
     cantor_vs_lch();
+    // test_cantor_parallel();
     return 0;
 }

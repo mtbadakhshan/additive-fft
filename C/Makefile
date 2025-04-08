@@ -1,6 +1,6 @@
 CC=    gcc
 
-CFLAGS= -O3 -funroll-loops -mavx2 -mpclmul -std=c23 -Wextra -Wall -I .
+CFLAGS= -O3 -fopenmp -funroll-loops -mavx2 -mpclmul -std=c23 -Wextra -Wall -I .
 
 CANTOR_DIR = cantor
 CANTOR_SRC = $(wildcard $(CANTOR_DIR)/*.c)
