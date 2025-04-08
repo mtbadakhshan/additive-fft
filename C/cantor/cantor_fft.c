@@ -132,14 +132,10 @@ __m128i* cantor_fft_gf2128_parallel(__m128i* fx, unsigned n_term){
     #endif
     unsigned m = LOG2(n_term);
     
-    #pragma omp parallel
-    {
-        #pragma omp single
-        {
+
             // printf("Thread %d says hello\n", omp_get_thread_num());
             cantor_fft_gf2128_parallel_task(poly, m, 0, m-1);
-        }       
-    }
+
     return poly;
 }
 

@@ -48,7 +48,7 @@ void test_cantor_parallel(){
     printf("are equal = %b\n", are_equal_vec_128bit(evals, evals3, n));
 }
 
-#define ITERATIONS 1
+#define ITERATIONS 10
 void cantor_vs_lch(){
     printf("m\tCantor\t\tCantor HC\tCantor PARALLEL\tLCH\n");
     for (unsigned m = 9; m < 22; m++){
@@ -66,6 +66,10 @@ void cantor_vs_lch(){
             free(evals);
         }
 
+        #pragma omp parallel
+        {
+            #pragma omp single
+            {
         for (unsigned iter = 0; iter < ITERATIONS; ++iter){
             __m128i* fx1 = random_polynomial_gf2128(n);
             start = clock();
@@ -75,6 +79,8 @@ void cantor_vs_lch(){
             free(fx1);
             free(evals);
         }
+    }       
+}
 
         for (unsigned iter = 0; iter < ITERATIONS; ++iter){
             __m128i* fx1 = random_polynomial_gf2128(n);
