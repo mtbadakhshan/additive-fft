@@ -154,4 +154,5 @@ constexpr unsigned int n_terms[31] =
 };
 
 } //namespace cantor 
-#endif
+#include "Cantor/cantor_basis.tcc"
+#endif//CANTOR_BASIS_HPP

@@ -4,9 +4,121 @@
 
 #include <iostream>
 #include "utils/utils.hpp"
-
+#include "Cantor/cantor_basis.hpp"
 
 namespace cantor {
+
+// The precomputations are hard coded. This is for the case that the affine shift is zero
+template<typename FieldT>   
+std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs, const size_t domain_dim, const size_t shift_dim){
+    const size_t m = domain_dim;
+    std::vector<FieldT> g(poly_coeffs);
+    g.resize((1ULL << m), FieldT::zero());
+    const size_t n = g.size();
+    assert(n == (1ull<<m));
+
+    FieldT* cantor_combinations;
+    if(FieldT::extension_degree() == 128) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to128;
+    else if(FieldT::extension_degree() == 192) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to192;
+    else if(FieldT::extension_degree() == 256) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to256;
+    else throw std::invalid_argument("The field size should be either 128, or 256 for using the cantor basis");
+
+    size_t input_size = n;
+    size_t n_modules = 1;
+
+    const unsigned* nz_S;
+    size_t S_index = m, t;
+    for (int r = 0; r < m; ++r)
+    {   
+        --S_index; 
+        nz_S = s_i[S_index]; t=n_terms[S_index];
+        size_t offset = 0;
+        size_t half_input_size = input_size >> 1;
+        size_t shift_bit = shift_dim==0 ? 0 :n_modules << (shift_dim - m);
+
+
+        for (size_t module = 0; module < n_modules; ++module){
+            size_t module_shifted = (module|shift_bit) << 1, i_256 = 0;
+            FieldT mult_factor = FieldT::zero();
+            while(module_shifted){
+                mult_factor += cantor_combinations[i_256 + (module_shifted & 0xff)];
+                i_256 += 256;
+                module_shifted >>= 8;
+            }
+            size_t offset2 = offset + half_input_size;
+            for (unsigned k = offset2 + half_input_size - 1; k >= offset2; --k){
+                FieldT gk = g[k];
+                for (unsigned i = 0; i < t; ++i){
+                    g[k - nz_S[i]] += gk;
+                }
+                g[k-half_input_size] += gk * mult_factor;
+            }
+            for (size_t j = 0; j < half_input_size; ++j)
+                g[offset2+j] += g[offset+j];
+
+            offset += input_size;
+        }
+        input_size = half_input_size;
+        n_modules <<= 1;
+    }
+    return g;
+}
+
+template<typename FieldT>   
+std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &evals, 
+                                 const size_t domain_dim, const size_t shift_dim){
+    const size_t m = domain_dim;
+    std::vector<FieldT> g(evals);
+    // g.resize((1ULL << m), FieldT::zero());
+    const size_t n = g.size();
+    assert(n == (1ull<<m));
+
+    FieldT* cantor_combinations;
+    if(FieldT::extension_degree() == 128) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to128;
+    else if(FieldT::extension_degree() == 192) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to192;
+    else if(FieldT::extension_degree() == 256) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to256;
+    else throw std::invalid_argument("The field size should be either 128, or 256 for using the cantor basis");
+
+    size_t input_size = 1;
+    size_t n_modules = n;
+
+    const unsigned* nz_S;
+    size_t S_index = 0, t;
+    for (int r = m-1; r >=0; --r)
+    {   
+        nz_S = s_i[S_index]; t=n_terms[S_index];
+        n_modules >>= 1;
+        size_t half_input_size = input_size;
+        input_size <<= 1;
+        size_t shift_bit = shift_dim==0 ? 0 :n_modules << (shift_dim - m);
+        size_t offset = 0;
+        for (size_t module = 0; module < n_modules; ++module){
+            size_t module_shifted = (module|shift_bit) << 1, i_256 = 0;
+            // std::cout<<"module_shifted: "<< std::bitset<16>(module_shifted) << std::endl;
+            FieldT mult_factor = FieldT::zero();
+            while(module_shifted){
+                mult_factor += cantor_combinations[i_256 + (module_shifted & 0xff)];
+                i_256 += 256;
+                module_shifted >>= 8;
+                // std::cout<<"module_shifted: "<< std::bitset<16>(module_shifted) << std::endl;
+            }
+            size_t offset2 = offset + half_input_size;
+            for (size_t j = 0; j < half_input_size; ++j)
+                g[offset2+j] += g[offset+j];
+
+            for (size_t k =  offset2; k < offset2+half_input_size; ++k){
+                FieldT gk = g[k];
+                g[k-half_input_size] += gk * mult_factor;
+                for (size_t i = 0; i < t; ++i){
+                    g[k - nz_S[i]] += gk;
+                }
+            }
+            offset += input_size;
+        }
+        S_index ++;
+    }
+    return g;
+}
 
 template<typename FieldT>
 PreComputedValues<FieldT> pre_computation(const libiop::affine_subspace<FieldT> &domain)

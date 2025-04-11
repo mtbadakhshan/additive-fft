@@ -113,8 +113,8 @@ void cantor_fft_gf2128_parallel_task(__m128i* poly, unsigned S_index, unsigned m
         
             #pragma omp task 
             cantor_fft_gf2128_parallel_task(poly + half_input_size, S_index, (module << 1) + 1, cutoff);
-        
-            // #pragma omp taskwait
+
+            #pragma omp taskwait      
         } else {
             // Serial execution to avoid too many small tasks
             cantor_fft_gf2128_parallel_task(poly, S_index, module << 1, cutoff);
@@ -134,8 +134,7 @@ __m128i* cantor_fft_gf2128_parallel(__m128i* fx, unsigned n_term){
     
 
             // printf("Thread %d says hello\n", omp_get_thread_num());
-            cantor_fft_gf2128_parallel_task(poly, m, 0, m-1);
-
+            cantor_fft_gf2128_parallel_task(poly, m, 0, m-2);
     return poly;
 }
 

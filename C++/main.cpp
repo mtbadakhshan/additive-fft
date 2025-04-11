@@ -15,6 +15,7 @@
 
 #include "utils/utils.hpp"
 #include "Cantor/fft.hpp"
+#include "LCH/fft.hpp"
 #include "Gao/fft.hpp"
 
 template <typename T>
@@ -273,11 +274,17 @@ void check_the_basis_element_order(){
         std::cout << "e^3 = "  << (element^3) << " | ";
         std::cout << "e^4 = "  << (element^4) << " | ";
         std::cout << "e^5 = "  << (element^2) << std::endl;
-
-
-
-
     }
+}
+
+void test_LCH(){
+    typedef libff::gf192 FieldT;
+    unsigned m = 15;
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+    const std::vector<FieldT> cantor_result = cantor::additive_IFFT<FieldT>(poly_coeffs, m, 0);
+    const std::vector<FieldT> lch_result = lch::additive_IFFT(poly_coeffs, m, 0);
+
+    std::cout << "Equality check: " << (check_equal<FieldT>(lch_result, cantor_result) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
 }
 
 int main()
@@ -290,7 +297,9 @@ int main()
 
     // Valgrid_libiop_test();
     // Valgrid_cantorPC_test();
-    check_the_basis_element_order();
+    // check_the_basis_element_order();
+
+    test_LCH();
 
     return 0;
 }

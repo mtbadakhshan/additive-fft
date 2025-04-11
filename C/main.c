@@ -14,7 +14,7 @@
 #define LOG2(X) ((unsigned) (8*sizeof (unsigned long long) - __builtin_clzll((X)) - 1))
 
 void test_bitpolymul_lch(){
-	unsigned m = 5; // degree n = 2^m
+	unsigned m = 3; // degree n = 2^m
 	unsigned n = (1ULL) << m; // n is even and it must be even for keeping the 32 byte
     printf("m = %u, n = %u\n", m, n);
     // Generating the random polynomial in GF_2^128
@@ -37,18 +37,24 @@ void test_cantor(){
 }
 
 void test_cantor_parallel(){
-    unsigned m = 15; // degree n = 2^m
+    unsigned m = 20; // degree n = 2^m
 	unsigned n = (1ULL) << m; // n is even and it must be even for keeping the 32 byte
     printf("m = %u, n = %u\n", m, n);
     // Generating the random polynomial in GF_2^128
 	__m128i* fx = random_polynomial_gf2128(n);
-    __m128i* evals = cantor_fft_gf2128(fx, n);
-    __m128i* evals3 = cantor_fft_gf2128_parallel(fx, n);
+    // __m128i* evals = cantor_fft_gf2128(fx, n);
+    #pragma omp parallel
+        {
+            #pragma omp single
+            {
+                __m128i* evals3 = cantor_fft_gf2128_parallel(fx, n);
+            }
+        }
     // __m128i* evals2 = naive_evaluate(fx, n);
-    printf("are equal = %b\n", are_equal_vec_128bit(evals, evals3, n));
+    // printf("are equal = %b\n", are_equal_vec_128bit(evals, evals3, n));
 }
 
-#define ITERATIONS 10
+#define ITERATIONS 50
 void cantor_vs_lch(){
     printf("m\tCantor\t\tCantor HC\tCantor PARALLEL\tLCH\n");
     for (unsigned m = 9; m < 22; m++){
@@ -110,9 +116,9 @@ void cantor_vs_lch(){
 int main(){
     srand(time(NULL));
     // validate_cantor_basis();
-    // test_bitpolymul_lch();
+    test_bitpolymul_lch();
     // test_cantor();
-    cantor_vs_lch();
+    // cantor_vs_lch();
     // test_cantor_parallel();
     return 0;
 }
