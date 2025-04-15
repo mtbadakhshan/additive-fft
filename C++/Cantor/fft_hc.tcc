@@ -1,4 +1,5 @@
 
+#include "div_by_s_i.hpp"
 namespace cantor {
 
     template<typename FieldT>   
