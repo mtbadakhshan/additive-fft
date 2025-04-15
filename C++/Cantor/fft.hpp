@@ -41,4 +41,5 @@ std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &evals,
 } // namespace cantor
 
 #include "fft.tcc"
+#include "fft_hc.tcc"
 #endif // ADDITIVE_FFT_CANTOR_HPP_
