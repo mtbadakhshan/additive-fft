@@ -246,7 +246,6 @@ namespace cantor {
         size_t shift_bit;
 
         if(m>0){ // r = m-1 (S_0) (input_size = 2)   
-            // std::cout<<"HERE m>0\n";
             offset = 0;
             half_input_size = input_size;
             input_size <<= 1;
@@ -266,7 +265,6 @@ namespace cantor {
         }
 
         if(m>1){ // r = m-2 (S_1) (input_size = 4)
-            // std::cout<<"HERE m>1\n";
             offset = 0;
             half_input_size = input_size;
             input_size <<= 1;
@@ -286,7 +284,6 @@ namespace cantor {
         }
 
         if(m>2){ // r = m-3 (S_2) (input_size = 8)
-            // std::cout<<"HERE m>2\n";
             offset = 0;
             half_input_size = input_size;
             input_size <<= 1;
@@ -348,9 +345,6 @@ namespace cantor {
             // half_input_size = input_size >> 1;
             while (S_index >= 5 && S_index < 8)
             {   
-                std::cout<<"S_index: "<<S_index<<std::endl;
-                std::cout<<"m: "<<m<<std::endl;
-
                 nz_S = libiop::s_i[S_index]; t=libiop::n_terms[S_index];
                 offset = 0;
                 half_input_size = input_size;
@@ -383,7 +377,6 @@ namespace cantor {
 
 
         if(m>8){    // r = m-9 (S_8) (input_size = 512)
-            std::cout<<"HERE\n";
             offset = 0;
             half_input_size = input_size;
             input_size <<= 1;
@@ -406,9 +399,6 @@ namespace cantor {
             S_index = 9;
             while (S_index >= 9 && S_index < m)
             {   
-                std::cout<<"S_index: "<<S_index<<std::endl;
-                std::cout<<"m: "<<m<<std::endl;
-
                 nz_S = libiop::s_i[S_index]; t=libiop::n_terms[S_index];
                 offset = 0;
                 half_input_size = input_size;

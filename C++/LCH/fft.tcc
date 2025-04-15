@@ -14,9 +14,9 @@ namespace lch {
         assert(n == (1ull<<m));
         
         FieldT* cantor_combinations;
-        if(FieldT::extension_degree() == 128) cantor_combinations = (FieldT*) cantor::cantor_combinations_8R_in_gf2to128;
-        else if(FieldT::extension_degree() == 192) cantor_combinations = (FieldT*) cantor::cantor_combinations_8R_in_gf2to192;
-        else if(FieldT::extension_degree() == 256) cantor_combinations = (FieldT*) cantor::cantor_combinations_8R_in_gf2to256;
+        if(FieldT::extension_degree() == 128) cantor_combinations = (FieldT*) libiop::cantor_combinations_8R_in_gf2to128;
+        else if(FieldT::extension_degree() == 192) cantor_combinations = (FieldT*) libiop::cantor_combinations_8R_in_gf2to192;
+        else if(FieldT::extension_degree() == 256) cantor_combinations = (FieldT*) libiop::cantor_combinations_8R_in_gf2to256;
         else throw std::invalid_argument("The field size should be either 128, or 256 for using the cantor basis");
     
 
@@ -35,9 +35,9 @@ namespace lch {
         assert(n == (1ull<<m));
         
         FieldT* cantor_combinations;
-        if(FieldT::extension_degree() == 128) cantor_combinations = (FieldT*) cantor::cantor_combinations_8R_in_gf2to128;
-        else if(FieldT::extension_degree() == 192) cantor_combinations = (FieldT*) cantor::cantor_combinations_8R_in_gf2to192;
-        else if(FieldT::extension_degree() == 256) cantor_combinations = (FieldT*) cantor::cantor_combinations_8R_in_gf2to256;
+        if(FieldT::extension_degree() == 128) cantor_combinations = (FieldT*) libiop::cantor_combinations_8R_in_gf2to128;
+        else if(FieldT::extension_degree() == 192) cantor_combinations = (FieldT*) libiop::cantor_combinations_8R_in_gf2to192;
+        else if(FieldT::extension_degree() == 256) cantor_combinations = (FieldT*) libiop::cantor_combinations_8R_in_gf2to256;
         else throw std::invalid_argument("The field size should be either 128, or 256 for using the cantor basis");
     
         inv_butterfly(g, n, shift_dim, cantor_combinations);
