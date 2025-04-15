@@ -13,7 +13,9 @@ namespace lch {
     std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs, 
                                     const size_t domain_dim, const size_t shift_dim);
     
-    
+    template<typename FieldT>   
+    std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &poly_coeffs, 
+                                    const size_t domain_dim, const size_t shift_dim);
 }
 
 #include "LCH/utils.tcc"

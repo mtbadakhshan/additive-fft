@@ -280,12 +280,15 @@ void check_the_basis_element_order(){
 void test_LCH(){
     typedef libff::gf192 FieldT;
     unsigned m = 15;
-    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
-    const std::vector<FieldT> cantor_result = cantor::additive_IFFT<FieldT>(poly_coeffs, m, 0);
-    const std::vector<FieldT> lch_result = lch::additive_IFFT(poly_coeffs, m, 0);
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << (m-10));
+    const std::vector<FieldT> cantor_result = cantor::additive_FFT_hc<FieldT>(poly_coeffs, m, 25);
+    const std::vector<FieldT> lch_result = lch::additive_FFT(poly_coeffs, m, 25);
 
     std::cout << "Equality check: " << (check_equal<FieldT>(lch_result, cantor_result) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
 }
+
+
+
 
 int main()
 {

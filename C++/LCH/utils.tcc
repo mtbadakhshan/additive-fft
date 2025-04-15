@@ -118,15 +118,15 @@ namespace lch {
 
     template<typename FieldT>   
     static
-    void butterfly_op( std::vector<FieldT> &poly, unsigned offset, unsigned unit , unsigned ska, size_t shift_dim, FieldT* cantor_combinations )
+    void butterfly_op( std::vector<FieldT> &poly, unsigned offset, unsigned unit , unsigned ska, size_t shift_bit, FieldT* cantor_combinations)
     {
-        size_t module_shifted = ska, i_256 = 0;
-            FieldT mult_factor = FieldT::zero();
-            while(module_shifted){
-                mult_factor += cantor_combinations[i_256 + (module_shifted & 0xff)];
-                i_256 += 256;
-                module_shifted >>= 8;
-            }
+        size_t module_shifted = (ska) | (shift_bit<<1), i_256 = 0;
+        FieldT mult_factor = FieldT::zero();
+        while(module_shifted){
+            mult_factor += cantor_combinations[i_256 + (module_shifted & 0xff)];
+            i_256 += 256;
+            module_shifted >>= 8;
+        }
 
         unsigned unit_2= unit/2;
         for(unsigned i=0;i<unit_2;i++) {
@@ -147,15 +147,16 @@ namespace lch {
 	    for(unsigned i=log_n; i > 0; i--) {
 		    unsigned unit = (1<<i);
 		    unsigned num = n_terms / unit;
+            size_t shift_bit = shift_dim==0 ? 0 :(1<<(log_n-i)) << (shift_dim - log_n);
 
-		    butterfly_0( poly_coeffs , unit );
-		for(unsigned j=1;j<num;j++) {
-			butterfly_op( poly_coeffs, j*unit , unit , get_s_k_a_cantor( i-1 , j*unit ), shift_dim, cantor_combinations);
+		    // butterfly_0( poly_coeffs , unit );
+		for(unsigned j=0;j<num;j++) {
+			butterfly_op( poly_coeffs, j*unit , unit , get_s_k_a_cantor( i-1 , j*unit ), shift_bit, cantor_combinations);
             }
         }
     }
 
-// INVERSE
+// INVERSE ---------------------------------------------------------------------------------------------------------
 
     template<typename FieldT>   
     static inline
@@ -227,9 +228,9 @@ namespace lch {
 
     template<typename FieldT>   
     static
-    void i_butterfly_op( std::vector<FieldT> &poly, unsigned offset, unsigned unit , unsigned ska, size_t shift_dim, FieldT* cantor_combinations )
-    {
-        size_t module_shifted = ska, i_256 = 0;
+    void i_butterfly_op( std::vector<FieldT> &poly, unsigned offset, unsigned unit , unsigned ska, size_t shift_bit, FieldT* cantor_combinations )
+    {     
+        size_t module_shifted = (ska) | (shift_bit<<1), i_256 = 0;
         FieldT mult_factor = FieldT::zero();
         while(module_shifted){
             mult_factor += cantor_combinations[i_256 + (module_shifted & 0xff)];
@@ -255,10 +256,11 @@ namespace lch {
         for(unsigned i=1; i <= log_n; i++) {
             unsigned unit = (1<<i);
             unsigned num = n_terms / unit;
+            size_t shift_bit = shift_dim==0 ? 0 :(1<<(log_n-i)) << (shift_dim - log_n);
 
-            butterfly_0( poly_coeffs , unit );
-            for(unsigned j=1;j<num;j++) {
-                i_butterfly_op( poly_coeffs, j*unit , unit , get_s_k_a_cantor( i-1 , j*unit ), shift_dim, cantor_combinations); 
+            // butterfly_0( poly_coeffs , unit );
+            for(unsigned j=0;j<num;j++) {
+                i_butterfly_op( poly_coeffs, j*unit , unit , get_s_k_a_cantor( i-1 , j*unit ), shift_bit, cantor_combinations); 
             }
         }
     }

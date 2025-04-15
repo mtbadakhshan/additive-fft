@@ -184,7 +184,7 @@ __m128i* cantor_fft_hc_circuits_gf2128(__m128i* fx, unsigned n_term){
         n_modules <<= 1;
     }
 
-    // r = m-9 (S_8) (input_size = 256)
+    // r = m-9 (S_8) (input_size = 512)
     offset = 0;
     half_input_size = input_size >> 1;
         // Computing S_i
