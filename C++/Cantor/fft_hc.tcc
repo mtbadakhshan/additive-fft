@@ -6,7 +6,9 @@ namespace cantor {
     std::vector<FieldT> additive_FFT_hc(const std::vector<FieldT> &poly_coeffs, const size_t domain_dim, const size_t shift_dim){
         const size_t m = domain_dim;
         std::vector<FieldT> g(poly_coeffs);
-        size_t log_poly_terms = log2(poly_coeffs.size());
+        size_t log_poly_terms = libff::log2(poly_coeffs.size());
+        std::cout<<"log_poly_terms: "<<log_poly_terms<<std::endl;
+        std::cout<<"poly_coeffs.size(): "<<poly_coeffs.size()<<std::endl;
         // size_t diff_dim = m-log_poly_terms;
         g.resize((1ULL << m), FieldT::zero());
         const size_t n = g.size();
