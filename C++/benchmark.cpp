@@ -6,6 +6,8 @@
 #include "libiop/fft.hpp"
 #include "Cantor/fft.hpp"
 #include "Gao/fft.hpp"
+#include "LCH/fft.hpp"
+
 
 // Benchmark for libiop::naive_FFT -----------------------------------------------------------------------------------------------------------------------
 static void BM_libiop_naive_fft(benchmark::State &state)
@@ -144,6 +146,23 @@ static void BM_cantor_additive_fft(benchmark::State &state)
     state.SetItemsProcessed(state.iterations());
 }
 
+// Benchmark for cantor::additive_FFT (precmp-basis)-----------------------------------------------------------------------------------------------------------------------
+static void BM_cantor_additive_fft_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(poly_coeffs);
+        benchmark::DoNotOptimize(result = cantor::additive_FFT<FieldT>(poly_coeffs, m, 31));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
 // Benchmark for cantor::additive_FFT (precmp)-----------------------------------------------------------------------------------------------------------------------
 static void BM_cantor_additive_fft_precmp(benchmark::State &state)
 {
@@ -165,18 +184,38 @@ static void BM_cantor_additive_fft_precmp(benchmark::State &state)
     state.SetItemsProcessed(state.iterations());
 }
 
+// Benchmark for lch::additive_FFT (precmp-basis)-----------------------------------------------------------------------------------------------------------------------
+static void BM_lch_additive_fft_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(poly_coeffs);
+        benchmark::DoNotOptimize(result = lch::additive_FFT<FieldT>(poly_coeffs, m, 31));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+
 const int MIN_RANGE = std::stoi(std::getenv("BM_MIN_RANGE"));
 const int MAX_RANGE = std::stoi(std::getenv("BM_MAX_RANGE"));
 const int STEP = std::stoi(std::getenv("BM_STEP"));
 
 BENCHMARK(BM_libiop_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_gao_additive_fft_lvl1)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+// BENCHMARK(BM_gao_additive_fft_lvl1)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_gao_additive_fft_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_gao_additive_fft_co)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+// BENCHMARK(BM_gao_additive_fft_co)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_gao_additive_fft_co_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+// BENCHMARK(BM_cantor_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_cantor_additive_fft_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_cantor_additive_fft_precmp)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_libiop_naive_fft)->DenseRange(MIN_RANGE, 10, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+// BENCHMARK(BM_libiop_naive_fft)->DenseRange(MIN_RANGE, 10, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_lch_additive_fft_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 
 
 BENCHMARK_MAIN();
