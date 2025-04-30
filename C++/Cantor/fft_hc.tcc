@@ -7,8 +7,8 @@ namespace cantor {
         const size_t m = domain_dim;
         std::vector<FieldT> g(poly_coeffs);
         size_t log_poly_terms = libff::log2(poly_coeffs.size());
-        std::cout<<"log_poly_terms: "<<log_poly_terms<<std::endl;
-        std::cout<<"poly_coeffs.size(): "<<poly_coeffs.size()<<std::endl;
+        // std::cout<<"log_poly_terms: "<<log_poly_terms<<std::endl;
+        // std::cout<<"poly_coeffs.size(): "<<poly_coeffs.size()<<std::endl;
         // size_t diff_dim = m-log_poly_terms;
         g.resize((1ULL << m), FieldT::zero());
         const size_t n = g.size();
@@ -350,8 +350,8 @@ namespace cantor {
             // half_input_size = input_size >> 1;
             while (S_index >= 5 && S_index < 8)
             {   
-                std::cout<<"S_index: "<<S_index<<std::endl;
-                std::cout<<"m: "<<m<<std::endl;
+                // std::cout<<"S_index: "<<S_index<<std::endl;
+                // std::cout<<"m: "<<m<<std::endl;
 
                 nz_S = s_i[S_index]; t=n_terms[S_index];
                 offset = 0;
@@ -385,7 +385,7 @@ namespace cantor {
 
 
         if(m>8){    // r = m-9 (S_8) (input_size = 512)
-            std::cout<<"HERE\n";
+            // std::cout<<"HERE\n";
             offset = 0;
             half_input_size = input_size;
             input_size <<= 1;
@@ -408,8 +408,8 @@ namespace cantor {
             S_index = 9;
             while (S_index >= 9 && S_index < m)
             {   
-                std::cout<<"S_index: "<<S_index<<std::endl;
-                std::cout<<"m: "<<m<<std::endl;
+                // std::cout<<"S_index: "<<S_index<<std::endl;
+                // std::cout<<"m: "<<m<<std::endl;
 
                 nz_S = s_i[S_index]; t=n_terms[S_index];
                 offset = 0;
