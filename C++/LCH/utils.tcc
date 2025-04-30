@@ -128,6 +128,8 @@ namespace lch {
             module_shifted >>= 8;
         }
 
+        // std::cout<<"mult_factor: "<< mult_factor << " offset: "<<offset << " unit: " << unit << std::endl;
+
         unsigned unit_2= unit/2;
         for(unsigned i=0;i<unit_2;i++) {
             poly[offset + i] += poly[offset + unit_2+i] * mult_factor;
@@ -143,16 +145,23 @@ namespace lch {
         if( 1 >= n_terms ) return;
 
 	    unsigned log_n = __builtin_ctz( n_terms );
+	    unsigned m     = __builtin_ctz( poly_coeffs.size());
+
+        // std::cout<<"m: " << m << std::endl;
+        // std::cout<<"log_n: " << log_n << std::endl ;
 
 	    for(unsigned i=log_n; i > 0; i--) {
 		    unsigned unit = (1<<i);
-		    unsigned num = n_terms / unit;
-            size_t shift_bit = shift_dim==0 ? 0 :(1<<(log_n-i)) << (shift_dim - log_n);
+		    unsigned num = poly_coeffs.size() / unit;
+            // std::cout<<"i: " << i <<" num: " << num << " unit: " << unit << std::endl ;
+            size_t shift_bit = shift_dim==0 ? 0 :(num) << (shift_dim - m);
 
 		    // butterfly_0( poly_coeffs , unit );
 		for(unsigned j=0;j<num;j++) {
 			butterfly_op( poly_coeffs, j*unit , unit , get_s_k_a_cantor( i-1 , j*unit ), shift_bit, cantor_combinations);
+            // std::cout<<"get_s_k_a_cantor( i-1 , j*unit ): " << get_s_k_a_cantor( i-1 , j*unit ) << std::endl ;
             }
+            // my_print_vector(poly_coeffs);
         }
     }
 
