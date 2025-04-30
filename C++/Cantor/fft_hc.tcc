@@ -444,62 +444,180 @@ namespace cantor {
         return g;
     }
 
+    template<typename FieldT>
+    std::vector<FieldT> additive_FFT_hc(const std::vector<FieldT> &poly_coeffs, 
+                                            const PreComputedValues<FieldT> &values)
+    {
+        const size_t m = values.dimension;
+    
+        std::vector<FieldT> g(poly_coeffs);
+        g.resize(1ull<<m, FieldT::zero());
+        const size_t n = g.size();
+        assert(n == (1ull<<m));
+    
+        const unsigned* nz_S;
+        size_t input_size = n, t, S_index = m;
+        size_t half_input_size = input_size >> 1;
+        size_t offset = 0;
+        size_t n_modules = 1;
+        size_t cnt = 0;
+        // for (size_t r = 0; r < m; ++r)
+        // {
+        //     --S_index;
+        //     nz_S = s_i[S_index]; t=n_terms[S_index];
+        //     size_t offset = 0;
+        //     size_t half_input_size = input_size >> 1;
+    
+        //     for (size_t module = 0; module < n_modules; ++module){
+        //         FieldT mult_factor = values.mult_factor_vec[cnt++];
+        //         size_t offset2 = offset + half_input_size;
+        //         for (size_t k = offset2+half_input_size -1; k >= offset2; --k){
+        //             FieldT gk = g[k];
+        //             for (unsigned i = 0; i < t; ++i){
+        //                 g[k - nz_S[i]] += gk;
+        //             }
+        //             g[k-half_input_size] += gk * mult_factor;
+        //         }
+    
+        //         for (size_t j = 0; j < half_input_size; ++j)
+        //             g[offset2+j] += g[offset+j];
+    
+        //         offset += input_size;
+        //     }
+        //     input_size = half_input_size;
+        //     n_modules <<= 1;
+        // }
+
+        if(m>9){
+            for (int r = 0; r < m-9; ++r)
+            {   
+                --S_index; 
+                offset = 0;
+                nz_S = s_i[S_index]; t=n_terms[S_index];
+
+                for (size_t module = 0; module < n_modules; ++module){
+                    FieldT mult_factor = values.mult_factor_vec[cnt++];
+                    size_t offset2 = offset + half_input_size;
+                    for (unsigned k = offset2 + half_input_size - 1; k >= offset2; --k){
+                        FieldT gk = g[k];
+                        for (unsigned i = 0; i < t; ++i){
+                            g[k - nz_S[i]] += gk;
+                        }
+                        g[k-half_input_size] += gk * mult_factor;
+                    }
+                    for (size_t j = 0; j < half_input_size; ++j)
+                        g[offset2+j] += g[offset+j];
+
+                    offset += input_size;
+                }
+                input_size = half_input_size;
+                n_modules <<= 1;
+                half_input_size = input_size >> 1;
+            }
+        }
+        
+        if(m>8){    // r = m-9 (S_8) (input_size = 512)
+            offset = 0;
+            half_input_size = input_size >> 1;
+            for (unsigned module = 0; module < n_modules; ++module){
+                FieldT mult_factor = values.mult_factor_vec[cnt++];
+                DIV_S8(mult_factor,offset);
+                offset += input_size;
+            }
+            input_size = half_input_size;
+            n_modules <<= 1;
+            S_index = 8; 
+        }
+
+        if(m>5){
+            offset = 0;
+            half_input_size = input_size >> 1;
+            for (int r = m-8; r < m-5; ++r)
+            {   
+                offset = 0;
+                --S_index; 
+                nz_S = s_i[S_index]; t=n_terms[S_index];
+                for (size_t module = 0; module < n_modules; ++module){
+                    FieldT mult_factor = values.mult_factor_vec[cnt++];
+                    size_t offset2 = offset + half_input_size;
+                    for (unsigned k = offset2 + half_input_size - 1; k >= offset2; --k){
+                        FieldT gk = g[k];
+                        for (unsigned i = 0; i < t; ++i){
+                            g[k - nz_S[i]] += gk;
+                        }
+                        g[k-half_input_size] += gk * mult_factor;
+                    }
+                    for (size_t j = 0; j < half_input_size; ++j)
+                        g[offset2+j] += g[offset+j];
+
+                    offset += input_size;
+                }
+                input_size = half_input_size;
+                half_input_size = input_size >> 1;
+                n_modules <<= 1;
+            }
+        }
+
+        if(m>4){     // r = m-5 (S_4) (input_size = 32)
+            offset = 0;
+            half_input_size = input_size >> 1;
+            for (unsigned module = 0; module < n_modules; ++module){    
+                FieldT mult_factor = values.mult_factor_vec[cnt++];
+                DIV_S4(mult_factor,offset);
+                offset += 32;
+            }
+            input_size = half_input_size;
+            n_modules <<= 1;
+        }
+
+        if(m>3){ // r = m-4 (S_3) (input_size = 16)
+            offset = 0;
+            half_input_size = input_size >> 1;
+            for (unsigned module = 0; module < n_modules; ++module){    
+                FieldT mult_factor = values.mult_factor_vec[cnt++];             
+                DIV_S3(mult_factor,offset);
+                offset += 16;
+            }
+            input_size = half_input_size;
+            n_modules <<= 1;
+        }
+
+        if(m>2){ // r = m-3 (S_2) (input_size = 8)
+            offset = 0;
+            half_input_size = input_size >> 1;
+            for (unsigned module = 0; module < n_modules; ++module){    
+                FieldT mult_factor = values.mult_factor_vec[cnt++];               
+                DIV_S2(mult_factor,offset);
+                offset += 8;
+            }
+            input_size = half_input_size;
+            n_modules <<= 1;
+        }
+
+        if(m>1){ // r = m-2 (S_1) (input_size = 4)
+            offset = 0;
+            half_input_size = input_size >> 1;
+            for (unsigned module = 0; module < n_modules; ++module){    
+                FieldT mult_factor = values.mult_factor_vec[cnt++];              
+                DIV_S1(mult_factor,offset);
+                offset += 4;
+            }
+            input_size = half_input_size;
+            n_modules <<= 1;
+        }
+
+        if(m>0){ // r = m-1 (S_0) (input_size = 4)    
+            offset = 0;
+            half_input_size = input_size >> 1;
+            for (unsigned module = 0; module < n_modules; ++module){    
+                FieldT mult_factor = values.mult_factor_vec[cnt++];               
+                DIV_S0(mult_factor,offset);
+                offset += 2;
+            }
+        }
 
 
-    // template<typename FieldT>   
-    // std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &evals, 
-    //                                 const size_t domain_dim, const size_t shift_dim){
-    //     const size_t m = domain_dim;
-    //     std::vector<FieldT> g(evals);
-    //     // g.resize((1ULL << m), FieldT::zero());
-    //     const size_t n = g.size();
-    //     assert(n == (1ull<<m));
-
-    //     FieldT* cantor_combinations;
-    //     if(FieldT::extension_degree() == 128) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to128;
-    //     else if(FieldT::extension_degree() == 192) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to192;
-    //     else if(FieldT::extension_degree() == 256) cantor_combinations = (FieldT*) cantor_combinations_8R_in_gf2to256;
-    //     else throw std::invalid_argument("The field size should be either 128, or 256 for using the cantor basis");
-
-    //     size_t input_size = 1;
-    //     size_t n_modules = n;
-
-    //     const unsigned* nz_S;
-    //     size_t S_index = 0, t;
-    //     for (int r = m-1; r >=0; --r)
-    //     {   
-    //         nz_S = s_i[S_index]; t=n_terms[S_index];
-    //         n_modules >>= 1;
-    //         size_t half_input_size = input_size;
-    //         input_size <<= 1;
-    //         size_t shift_bit = shift_dim==0 ? 0 :n_modules << (shift_dim - m);
-    //         size_t offset = 0;
-    //         for (size_t module = 0; module < n_modules; ++module){
-    //             size_t module_shifted = (module|shift_bit) << 1, i_256 = 0;
-    //             // std::cout<<"module_shifted: "<< std::bitset<16>(module_shifted) << std::endl;
-    //             FieldT mult_factor = FieldT::zero();
-    //             while(module_shifted){
-    //                 mult_factor += cantor_combinations[i_256 + (module_shifted & 0xff)];
-    //                 i_256 += 256;
-    //                 module_shifted >>= 8;
-    //                 // std::cout<<"module_shifted: "<< std::bitset<16>(module_shifted) << std::endl;
-    //             }
-    //             size_t offset2 = offset + half_input_size;
-    //             for (size_t j = 0; j < half_input_size; ++j)
-    //                 g[offset2+j] += g[offset+j];
-
-    //             for (size_t k =  offset2; k < offset2+half_input_size; ++k){
-    //                 FieldT gk = g[k];
-    //                 g[k-half_input_size] += gk * mult_factor;
-    //                 for (size_t i = 0; i < t; ++i){
-    //                     g[k - nz_S[i]] += gk;
-    //                 }
-    //             }
-    //             offset += input_size;
-    //         }
-    //         S_index ++;
-    //     }
-    //     return g;
-    // }
+        return g;
+    }
 
 } // namespace cantor
