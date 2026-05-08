@@ -146,6 +146,47 @@ static void BM_cantor_additive_fft(benchmark::State &state)
     state.SetItemsProcessed(state.iterations());
 }
 
+// Same domain setup as BM_cantor_additive_fft for apples-to-apples comparison with radix-4.
+static void BM_cantor_additive_fft_radix4(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(poly_coeffs);
+        benchmark::DoNotOptimize(domain);
+        benchmark::DoNotOptimize(result = cantor::additive_FFT_radix4<FieldT>(poly_coeffs, domain.subspace()));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+// Templated radix-2^K benchmark; instantiated for K = 2, 3, 4.
+template<size_t K>
+static void BM_cantor_additive_fft_radix2k(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(poly_coeffs);
+        benchmark::DoNotOptimize(domain);
+        benchmark::DoNotOptimize(result = cantor::additive_FFT_radix2k<K, FieldT>(poly_coeffs, domain.subspace()));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
 // Benchmark for cantor::additive_FFT (precmp-basis)-----------------------------------------------------------------------------------------------------------------------
 static void BM_cantor_additive_fft_precmp_basis(benchmark::State &state)
 {
@@ -201,6 +242,41 @@ static void BM_lch_additive_fft_precmp_basis(benchmark::State &state)
     state.SetItemsProcessed(state.iterations());
 }
 
+// Benchmark for lch::additive_FFT_radix4 (precmp-basis)-----------------------------------------------------------------------------------------------------------------------
+static void BM_lch_additive_fft_radix4_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(poly_coeffs);
+        benchmark::DoNotOptimize(result = lch::additive_FFT_radix4<FieldT>(poly_coeffs, m, 31));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+// Benchmark for lch::additive_FFT_radix2k<K> (precmp-basis) ---------------
+template<size_t K>
+static void BM_lch_additive_fft_radix2k_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+
+    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(poly_coeffs);
+        benchmark::DoNotOptimize(result = lch::additive_FFT_radix2k<K, FieldT>(poly_coeffs, m, 31));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
 
 const int MIN_RANGE = std::stoi(std::getenv("BM_MIN_RANGE"));
 const int MAX_RANGE = std::stoi(std::getenv("BM_MAX_RANGE"));
@@ -211,11 +287,21 @@ BENCHMARK(BM_libiop_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(
 BENCHMARK(BM_gao_additive_fft_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 // BENCHMARK(BM_gao_additive_fft_co)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_gao_additive_fft_co_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-// BENCHMARK(BM_cantor_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_cantor_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_cantor_additive_fft_radix4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k, 2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k, 3)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k, 4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_cantor_additive_fft_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_cantor_additive_fft_precmp)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 // BENCHMARK(BM_libiop_naive_fft)->DenseRange(MIN_RANGE, 10, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 BENCHMARK(BM_lch_additive_fft_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK(BM_lch_additive_fft_radix4_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 1)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 3)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 5)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 
 
 BENCHMARK_MAIN();

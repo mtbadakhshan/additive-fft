@@ -287,6 +287,135 @@ void test_LCH(){
     std::cout << "Equality check: " << (check_equal<FieldT>(lch_result, cantor_result) ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")  << std::endl;
 }
 
+// Correctness check: lch::additive_FFT_radix2k<K> against the radix-2 baseline
+// for K in {1, 2, 3, 4, 5}, exercising even/odd log_n cases.
+void test_LCH_radix2k_correctness(){
+    typedef libff::gf256 FieldT;
+    const std::vector<unsigned> ms = {6, 8, 9, 10, 12, 14, 15, 16, 18, 20};
+    bool all_passed = true;
+
+    for (unsigned m : ms) {
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+        const auto baseline = lch::additive_FFT<FieldT>(poly_coeffs, m, m);
+
+        const auto r2k1 = lch::additive_FFT_radix2k<1, FieldT>(poly_coeffs, m, m);
+        const auto r2k2 = lch::additive_FFT_radix2k<2, FieldT>(poly_coeffs, m, m);
+        const auto r2k3 = lch::additive_FFT_radix2k<3, FieldT>(poly_coeffs, m, m);
+        const auto r2k4 = lch::additive_FFT_radix2k<4, FieldT>(poly_coeffs, m, m);
+        const auto r2k5 = lch::additive_FFT_radix2k<5, FieldT>(poly_coeffs, m, m);
+        const auto r4   = lch::additive_FFT_radix4<FieldT>(poly_coeffs, m, m);
+
+        const bool ok1  = check_equal<FieldT>(baseline, r2k1);
+        const bool ok2  = check_equal<FieldT>(baseline, r2k2);
+        const bool ok2b = check_equal<FieldT>(baseline, r4);
+        const bool ok3  = check_equal<FieldT>(baseline, r2k3);
+        const bool ok4  = check_equal<FieldT>(baseline, r2k4);
+        const bool ok5  = check_equal<FieldT>(baseline, r2k5);
+
+        std::cout << "m=" << m
+                  << "  K=1: "      << (ok1  ? "PASS" : "FAIL")
+                  << "  K=2: "      << (ok2  ? "PASS" : "FAIL")
+                  << "  radix4: "   << (ok2b ? "PASS" : "FAIL")
+                  << "  K=3: "      << (ok3  ? "PASS" : "FAIL")
+                  << "  K=4: "      << (ok4  ? "PASS" : "FAIL")
+                  << "  K=5: "      << (ok5  ? "PASS" : "FAIL")
+                  << std::endl;
+
+        all_passed = all_passed && ok1 && ok2 && ok2b && ok3 && ok4 && ok5;
+    }
+    std::cout << (all_passed ? "ALL PASS" : "SOME FAILED") << std::endl;
+}
+
+// Correctness check: lch::additive_FFT_radix4 against the radix-2 baseline
+// across several (m, n_poly, shift_dim) configurations, including:
+//   * odd log_n (exercises the residual radix-2 stage),
+//   * poly_coeffs.size() < 2^m (exercises the post-conversion replication),
+//   * shift_dim = 0 (linear subspace, no affine shift),
+//   * shift_dim > m (affine shift outside the FFT domain).
+void test_LCH_radix4_correctness(){
+    typedef libff::gf192 FieldT;
+
+    struct Case { unsigned m; size_t n_poly; size_t shift_dim; };
+    const std::vector<Case> cases = {
+        {6,  1u<<6,  6},
+        {7,  1u<<7,  7},
+        {8,  1u<<8,  8},
+        {9,  1u<<9,  9},
+        {10, 1u<<10, 10},
+        {12, 1u<<12, 12},
+        {14, 1u<<14, 14},
+        {15, 1u<<15, 15},
+        {16, 1u<<16, 16},
+        {17, 1656,   17},                        // log_poly_terms = 11 (odd)
+        {18, 1u<<18, 18},
+        {12, 1u<<12, 0 },                        // pure linear subspace
+        {12, 1u<<12, 20},                        // shift_dim > m
+        {13, 4321,   25},                        // poly < domain, odd log_n, large shift_dim
+    };
+
+    bool all_passed = true;
+    for (const auto& c : cases) {
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(c.n_poly);
+
+        const auto baseline = lch::additive_FFT<FieldT>(poly_coeffs, c.m, c.shift_dim);
+        const auto r4       = lch::additive_FFT_radix4<FieldT>(poly_coeffs, c.m, c.shift_dim);
+        const bool ok       = check_equal<FieldT>(baseline, r4);
+        all_passed = all_passed && ok;
+
+        std::cout << "m=" << c.m
+                  << "  n_poly=" << c.n_poly
+                  << "  shift_dim=" << c.shift_dim
+                  << "  radix-4 vs radix-2: "
+                  << (ok ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m")
+                  << std::endl;
+    }
+
+    std::cout << (all_passed ? "ALL PASS" : "SOME FAILED") << std::endl;
+}
+
+// Correctness check: cantor::additive_FFT_radix2k<K> against the radix-2 baseline
+// across several K and m values.
+void test_radix2k_correctness(){
+    typedef libff::gf256 FieldT;
+    const std::vector<size_t> ms = {2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18};
+    bool all_passed = true;
+
+    for (size_t m : ms) {
+        std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+        libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+
+        const auto baseline = cantor::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
+
+        const auto r2k1 = cantor::additive_FFT_radix2k<1, FieldT>(poly_coeffs, domain.subspace());
+        const bool ok1 = check_equal<FieldT>(baseline, r2k1);
+
+        const auto r2k2 = cantor::additive_FFT_radix2k<2, FieldT>(poly_coeffs, domain.subspace());
+        const bool ok2 = check_equal<FieldT>(baseline, r2k2);
+
+        const auto r4 = cantor::additive_FFT_radix4<FieldT>(poly_coeffs, domain.subspace());
+        const bool ok2b = check_equal<FieldT>(baseline, r4);
+
+        const auto r2k3 = cantor::additive_FFT_radix2k<3, FieldT>(poly_coeffs, domain.subspace());
+        const bool ok3 = check_equal<FieldT>(baseline, r2k3);
+
+        const auto r2k4 = cantor::additive_FFT_radix2k<4, FieldT>(poly_coeffs, domain.subspace());
+        const bool ok4 = check_equal<FieldT>(baseline, r2k4);
+
+        std::cout << "m=" << m
+                  << "  K=1: " << (ok1 ? "PASS" : "FAIL")
+                  << "  K=2: " << (ok2 ? "PASS" : "FAIL")
+                  << "  radix4: " << (ok2b ? "PASS" : "FAIL")
+                  << "  K=3: " << (ok3 ? "PASS" : "FAIL")
+                  << "  K=4: " << (ok4 ? "PASS" : "FAIL")
+                  << std::endl;
+
+        all_passed = all_passed && ok1 && ok2 && ok2b && ok3 && ok4;
+    }
+
+    std::cout << (all_passed ? "ALL PASS" : "SOME FAILED") << std::endl;
+}
+
 
 
 
@@ -302,7 +431,11 @@ int main()
     // Valgrid_cantorPC_test();
     // check_the_basis_element_order();
 
-    test_LCH();
+    // test_LCH();
+    test_LCH_radix4_correctness();
+    test_LCH_radix2k_correctness();
+
+    // test_radix2k_correctness();
 
     return 0;
 }

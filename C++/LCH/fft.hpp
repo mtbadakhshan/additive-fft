@@ -1,6 +1,7 @@
 #ifndef ADDITIVE_FFT_LCH_HPP_
 #define ADDITIVE_FFT_LCH_HPP_
 
+#include <array>
 #include <cstddef>
 #include <vector>
 
@@ -12,7 +13,15 @@ namespace lch {
     template<typename FieldT>   
     std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs, 
                                     const size_t domain_dim, const size_t shift_dim);
-    
+
+    template<typename FieldT>
+    std::vector<FieldT> additive_FFT_radix4(const std::vector<FieldT> &poly_coeffs,
+                                            const size_t domain_dim, const size_t shift_dim);
+
+    template<size_t K, typename FieldT>
+    std::vector<FieldT> additive_FFT_radix2k(const std::vector<FieldT> &poly_coeffs,
+                                             const size_t domain_dim, const size_t shift_dim);
+
     template<typename FieldT>   
     std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &poly_coeffs, 
                                     const size_t domain_dim, const size_t shift_dim);

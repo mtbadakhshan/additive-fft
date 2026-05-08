@@ -1,0 +1,1049 @@
+\documentclass[11pt,runningheads]{llncs}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}              % fixes OMS/cmtt/m/n font warning
+
+\usepackage[dvipsnames]{xcolor}   % must come BEFORE \definecolor
+\definecolor{lightblue}{RGB}{153,204,255}
+\definecolor{lightred}{RGB}{255,204,153}
+
+\usepackage{graphicx} % Required for inserting images  % for \resizebox
+\usepackage{amsfonts}
+\usepackage{mathtools}
+\usepackage{algpseudocode}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\SetKw{KwDownTo}{down to}
+% \usepackage{amssymb}
+\usepackage{float}
+\usepackage{adjustbox}
+\usepackage{makecell}
+\usepackage{multirow}
+\usepackage{booktabs}   % for \toprule, \midrule, \bottomrule
+\usepackage{diagbox}    % if used elsewhere in your paper
+
+
+%cryptocode package used here for simplicity of writing some math symbol, e.g., '\set' for set notation, '\floor{}' for floor function notation
+\usepackage[
+n,
+operators,
+advantage,
+sets,
+adversary,
+landau,
+probability,
+notions,    
+logic,
+ff,
+mm,
+primitives,
+events,
+complexity,
+asymptotics,
+keys]{cryptocode}
+
+\renewcommand\RSsmallest{4pt} %fixes relsize "too small" warnings
+
+%splitatcommas used here for split math symbols in a newline
+\newcommand{\splitatcommas}[1]{%
+	\begingroup
+	\begingroup\lccode`~=`, \lowercase{\endgroup
+		\edef~{\mathchar\the\mathcode`, \penalty0 \noexpand\hspace{0pt plus 1em}}%
+	}\mathcode`,="8000 #1%
+	\endgroup
+}
+
+
+\setcounter{tocdepth}{2} % sections and subsections
+
+% \newcommand{\pmat}[1]{\begin{pmatrix}#1\end{pmatrix}}
+\newcommand{\mycomp}{\mathbin{\scalebox{0.7}{$\circ$}}}
+% \DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\dft}{DFT} %extra operator for writting DFT as in math mode
+\DeclareMathOperator{\fft}{AFFT} %extra operator for writting DFT as in math mode
+
+
+
+\usepackage{hyperref}
+\hypersetup{
+    hypertexnames = false,% This line solves the problem of hyperlink Appendix sections/tables
+    colorlinks   = true, %Colours links instead of ugly boxes
+    urlcolor     = blue, %Colour for external hyperlinks
+    linkcolor    = blue, %Colour of internal links
+    citecolor   = blue, %Colour of citations, could be ``red''
+    bookmarksopen=true,
+    bookmarksnumbered=true
+}
+
+% Thosse MUST come after hyperref
+% Springer LNCS font settings
+\renewcommand\UrlFont{\rmfamily}
+\urlstyle{rm}
+
+\usepackage{orcidlink}
+\usepackage{bookmark}
+
+
+\setcounter{secnumdepth}{3}
+
+
+\title{On FRI and Additive FFT Techniques for Proof Systems over Binary Extension Fields}
+\titlerunning{On FRI and Additive FFT Techniques}
+
+% \title{Revisiting Additive FFT and FRI}
+% \titlerunning{Revisiting Additive FFT and FRI}
+
+% Optimizing FRI and Additive FFTs for Proof Systems over Binary Extension Fields
+% On FRI and Additive FFT Techniques for Proof Systems over Binary Extension Fields
+
+
+
+\author{Susanta Samanta \and Guang Gong}
+
+% \authorrunning{}
+
+\institute{Department of Electrical and Computer Engineering, University of Waterloo,\\
+Waterloo, Ontario, N2L 3G1, Canada \\ 
+\email{\{ssamanta,ggong\}@uwaterloo.ca}
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+
+
+\begin{abstract}
+    The Fast Reed-Solomon Interactive Oracle Proof of Proximity (FRI) and additive Fast Fourier Transforms (FFTs) are core building blocks in many proof systems over binary extension fields. This paper presents a concrete efficiency study of several structural design choices in these components through a detailed cost analysis, aimed at clarifying their algorithmic tradeoffs in this setting. First, we analyze FRI using a localization parameter of $\eta=2$, emphasizing round complexity and the concrete cost of the resulting reduction steps. Second, we study additive FFTs, specifically focusing on the Cantor and LCH algorithms. We demonstrate that while Radix-4 designs of these algorithms require the exact same number of mathematical operations as their Radix-2 variants, Radix-4 runs significantly faster on actual computer hardware by reducing the total number of processing rounds and memory accesses. Finally, we propose a new additive FFT inspired by ECFFT techniques, providing a comprehensive cost analysis of the algorithm.
+\end{abstract}
+
+
+% \section{The FRI}
+
+\section{Introduction}
+The design of modern succinct arguments is increasingly driven by the goal of achieving scalability, transparency, and post-quantum security within a single framework. In constructions such as Aurora~\cite{Aurora2019}, STARK~\cite{STARK2018}, Fractal~\cite{Chiesa2020Fractal}, and Ligero~\cite{Ames2017Ligero}, this is typically accomplished via arithmetization, which expresses computational claims as collections of polynomial constraints. To obtain transparency and avoid trusted setup assumptions, these systems rely on Interactive Oracle Proofs of Proximity (IOPPs), with the Fast Reed-Solomon IOPP (FRI)~\cite{FRI2018} serving as the standard tool for certifying low-degree structure. In such settings, prover efficiency is determined largely by the cost of constructing, committing to, and processing evaluation sets over structured domains.
+
+
+
+
+\section{Algebraic Foundations}\label{Sec:Preliminary}
+\paragraph{Finite Field}
+Let $\mathbb{F}_{2^r}$ be the finite field of order $2^k$. We know that there exists a vector space isomorphism from $\mathbb{F}_{2^r}$ to $\mathbb{F}_2^k$ defined by $\mathbf{x}=(x_0\beta_0+x_1\beta_1+ \cdots +x_{r-1}\beta_{r-1}) \mapsto (x_0,x_1, \ldots,x_{r-1})$, where $\set{\beta_0,\beta_1,\ldots,\beta_{r-1}}$ is a basis of $\mathbb{F}_{2^r}$. The polynomial ring over $\mathbb{F}_{2^r}$ in the variable $x$ is denoted by $\mathbb{F}_{2^r}[x]$.
+
+\paragraph{Affine Subspace}
+Let us define the subspace $W_m$ of $\mathbb{F}_{2^r}$ as the linear combinations of $\{\beta_0, \beta_1, \ldots, \beta_{m-1}\}$. We order the elements of the subspace $W_m$ by $\{\eta_0=0, \eta_1, \eta_2, \dots, \eta_{2^m-1}\}$ where
+\(
+    \eta_j = \sum_{i=0}^{m-1} x_i \beta_i \quad \text{and} \quad j=\sum_{i=0}^{m-1} x_i 2^i, x_i\in \set{0,1}.
+\)
+
+Note that for any $0 \leq m < k$, we can decompose the elements of $W_{m+1}$ into two disjoint sets: the subspace $W_m$ and the \textit{affine subspace} $\beta_m + W_m$, where $\beta_m + W_m$ is the set obtained by translating (or shifting) the subspace $W_m$ by the vector $\beta_m$.
+
+More formally, this decomposition is given by $W_{m+1} = W_m \cup (\beta_m + W_m)$, where \[\beta_m + W_m = \set{\beta_m + w: w \in W_m} .\]
+
+Furthermore, if $m < r-1$ and $\theta$ is any linear combination of $\{\splitatcommas{\beta_{m+1}, \beta_{m+2}, \ldots, \beta_{r-1}}\}$, then we can decompose the elements of $\theta + W_{m+1}$ into two pairwise disjoint affine subspaces $\theta + W_m$ and $\beta_{m} + \theta + W_m$.
+
+\paragraph{Vanishing Polynomial}
+The polynomial $\mathbb{Z}_{W_{m}}(x)= \prod_{a\in W_m}^{} (x-a)$ which is a linearized polynomial, is given by $\mathbb{Z}_{W_{m}}(x) = \sum_{i=0}^{m} c_i x^{2^i}, c_i \in \mathbb{F}_{2^r}$. This polynomial is called the \textit{vanishing polynomial} for the subspace $W_m$. Since $W_{m+1}= W_m \cup (\beta_{m}+W_m)$, we have
+
+\[\mathbb{Z}_{W_{m+1}}(x)= (\mathbb{Z}_{W_{m}}(x))^2- \mathbb{Z}_{W_{m}}(\beta_{m})\cdot \mathbb{Z}_{W_{m}}(x). \]
+
+
+
+
+
+
+
+\section{Revisiting Additive FRI}
+Within the FRI protocol, assume $r$ represents the total round count. Additionally, assume that 
+\[L=\theta + <\beta_{0},\beta_{1}, \dots,\beta_{m-1}>.\]
+Let the polynomial $q_0(x)=x(x+\beta_0)$ and 
+
+\[ \theta^{(1)}=q_{0}(\theta),\quad \beta_{j}^{(1)}=q_{0}(\beta_{j+1}) \quad \text{for} \quad 0\le j\le m-2.\]
+Following this, the subsequent domain $L_{1}$ is constructed as:
+$$L_{1}=q_{0}(L_{0})=\theta^{(1)} + \langle\beta_{0}^{(1)},\beta_{1}^{(1)},\dots,\beta_{m-2}^{(1)}\rangle .$$
+By extending this logic recursively for $1\le k\le m-1$, we obtain:
+\[q_{k}(x)=x(x+\beta_{0}^{(k)}) \quad \text{and} \]
+\begin{equation*}
+    \begin{aligned}
+    &\theta^{(k+1)}
+    =q_{k}(\theta^{(k)}), \quad \beta_{j}^{(k+1)}
+    =q_{k}(\beta_{j+1}^{(k)}) \quad \text{for } 0\le j\le m-k-2
+    \end{aligned}
+\end{equation*}
+%
+Therefore,
+$$L_{k+1}=q_{k}(L_{k})=\theta^{(k+1)} + \langle\beta_{0}^{(k+1)},\beta_{1}^{(k+1)},\dots,\beta_{m-k-2}^{(k+1)}\rangle .$$
+
+\subsection{The Observation}
+Note that, $q_k(L_{k}[2i])=q_k(L_{k}[2i+1])=L_{k+1}[i]$ for $i=0,\ldots,2^{m-k-2}-1$. Now, if we decompose $f_{k}(x)$ such that
+\begin{equation}\label{Eqn:Radix-2Decomp}
+    f_{k}(x)= g_0(q_k(x))+ xg_1(q_k(x)),
+\end{equation}
+then we have
+\begin{equation*}
+    \begin{aligned}
+        \begin{bmatrix}
+            f_{k}(L_{k}[2i])\\
+            f_{k}(L_{k}[2i+1])
+        \end{bmatrix}
+        &=
+        \begin{bmatrix}
+            1 & L_{k}[2i]\\
+            1 & L_{k}[2i+1]
+        \end{bmatrix}
+        \begin{bmatrix}
+            g_0(L_{k+1}[i])\\
+            g_1(L_{k+1}[i])
+        \end{bmatrix}\\
+        &=
+        \begin{bmatrix}
+            1 & L_{k}[2i]\\
+            1 & L_{k}[2i]+\beta_{0}^{(k)}
+        \end{bmatrix}
+        \begin{bmatrix}
+            g_0(L_{k+1}[i])\\
+            g_1(L_{k+1}[i])
+        \end{bmatrix}\\
+        \implies
+        \begin{bmatrix}
+            g_0(L_{k+1}[i])\\
+            g_1(L_{k+1}[i])
+        \end{bmatrix} 
+        &=
+        \frac{1}{\beta_{0}^{(k)}}
+        \begin{bmatrix}
+            L_{k}[2i]+\beta_{0}^{(k)} & L_{k}[2i]\\
+            1 & 1
+        \end{bmatrix}
+        \begin{bmatrix}
+            f_{k}(L_{k}[2i])\\
+            f_{k}(L_{k}[2i]+ \beta_{0}^{(k)})
+        \end{bmatrix}\\
+        \implies
+        g_0(L_{k+1}[i])&= f_{k}(L_{k}[2i]) + \frac{L_{k}[2i]}{\beta_{0}^{(k)}} [f_{k}(L_{k}[2i]) +  f_{k}(L_{k}[2i]+\beta_{0}^{(k)})]\\
+        g_1(L_{k+1}[i])& =  \frac{1}{\beta_{0}^{(k)}}[f_{k}(L_{k}[2i]) +  f_{k}(L_{k}[2i]+\beta_{0}^{(k)})].
+    \end{aligned}
+\end{equation*}
+
+If the verifier send $\alpha_{(k)}$ as challenge, then new codeword $f^{k+1}$ is derived from the previous codewords. The new polynomial becomes
+\[f_{k+1}(x)=g_{0}(x)+\alpha_{(k)}\cdot g_{1}(x). \]
+
+Thus, we have $f_{k+1}(L_{k+1}[i])$
+\begin{equation*}
+    \begin{aligned}
+        &= g_0(L_{k+1}[i])+ \alpha_{(k)} \cdot g_1(L_{k+1}[i])\\
+        &= f_{k}(L_{k}[2i]) + \frac{L_{k}[2i]}{\beta_{0}^{(k)}} [f_{k}(L_{k}[2i]) +  f(L_{k}[2i]+\beta_{0}^{(k)})]\\
+        & \quad + \frac{\alpha_{(k)}}{\beta_{0}^{(k)}}[f_{k}(L_{k}[2i]) +  f_{k}(L_{k}[2i]+\beta_{0}^{(k)})]\\
+        &= f_{k}(L_{k}[2i]) + \frac{(\alpha_{(k)}+ L_{k}[2i])}{\beta_{0}^{(k)}} \cdot [f_{k}(L_{k}[2i]) +  f_{k}(L_{k}[2i]+\beta_{0}^{(k)})].
+    \end{aligned}
+\end{equation*}
+
+\subsection{Using Cantor special basis}
+If $\set{\beta_{0},\beta_{1}, \dots,\beta_{m-1}}$ forms Cantor special basis, then   
+\[\beta_{0}^{(k)}=1, \quad q_{k}(x)=x^2+x=S(x) \quad \text{for all } k.\]
+
+Also, 
+\[L_{k+1}=q_{k}(L_{k})= S^{k+1}(\theta)+ \langle 1,\beta_{1},\dots,\beta_{m-1-(k+1)} \rangle .\]
+
+Therefore, the next round codeword is,
+\begin{equation*}
+    \begin{aligned}
+        &f_{k+1}(L_{k+1}[i])\\
+        =& f_{k}(L_{k}[2i]) + (\alpha_{(k)}+ L_{k}[2i]) \cdot [f_{k}(L_{k}[2i]) +  f_{k}(L_{k}[2i]+1)].
+    \end{aligned}
+\end{equation*}
+
+\noindent \textbf{Cost analysis using Cantor special basis:}
+\vspace{1em}
+
+\noindent The total multiplications for folding phase in radix-2 FRI
+\begin{equation*}
+    \begin{aligned}
+        =& \frac{n}{2} + \frac{n}{2^2}+ \frac{n}{2^3}+ \cdots + 1\\
+        =& n-1
+    \end{aligned}
+\end{equation*}
+and total additions for folding phase in radix-2 FRI
+\begin{equation*}
+    \begin{aligned}
+        =& 3 \big[\frac{n}{2} + \frac{n}{2^2}+ \frac{n}{2^3}+ \cdots + 1 \big]\\
+        =& 3(n-1).
+    \end{aligned}
+\end{equation*}
+
+
+
+
+
+\section{Radix-4 variants of FRI}
+Here we decompose $f_k(x)$ such that
+\begin{equation}\label{Eqn:Radix-4Decomp}
+    f_{k}(x)= g_0(q_k(x))+ xg_1(q_k(x))+ x^2g_2(q_k(x))+ x^3g_3(q_k(x)) ,
+\end{equation}
+where $q_k(x)=x(x+\beta_{0}^{(k)})(x+\beta_{1}^{(k)})(x+\beta_{0}^{(k)}+\beta_{1}^{(k)})$.
+
+Note that 
+\[ q_k(L_{k}[4i])=q_k(L_{k}[4i+1])=q_k(L_{k}[4i+2])=q_k(L_{k}[4i+3])=L_{k+1}[i] \]
+
+If we assume $y=q_k(L_{k}[4i])=q_k(L_{k}[4i+1])=q_k(L_{k}[4i+2])=q_k(L_{k}[4i+3])=L_{k+1}[4i]$ and verifier challenge $\alpha_{(k)}$, then next round codeword is
+\[f_{k+1}(y)
+= g_{0}(y)+\alpha_{(k)}\cdot g_{1}(y)+ \alpha_{(k)}^2 \cdot g_{2}(y)+ \alpha_{(k)}^3 \cdot g_{3}(y) . \]
+
+The prover takes the 4 evaluations $f(L_{k}[4i]), f_k(L_{k}[4i+1]), f_k(L_{k}[4i+2])$, and $f_k(L_{k}[4i+3])$ and then runs a 4-point interpolation to find a local polynomial that connects them 
+\[R(x) = c_0 + c_1 x + c_2 x^2 + c_3 x^3 .\]
+The fundamental theorem of algebra states that given 4 distinct points, there exists exactly one unique polynomial of degree 3 or less that passes through all of them. 
+
+Because in Equation~\ref{Eqn:Radix-4Decomp}, the formula $g_0(y) + g_1(y)x + g_2(y)x^2 + g_3(y)x^3$ perfectly outputs the correct $f_k(x)$ evaluations for all 4 points in the affine space $\set{L_{k}[4i], L_{k}[4i+1], L_{k}[4i+2],L_{k}[4i+3]}$, it is that one unique polynomial. Therefore, the coefficients generated by the interpolation must perfectly match the constants from the global decomposition
+\[c_0 = g_0(y), c_1 = g_1(y), c_2 = g_2(y), ~\text{and}~ c_3 = g_3(y)  . \]
+
+Thus, the next round codeword is
+\[f_{k+1}(y)
+= c_0+\alpha_{(k)}\cdot c_1+ \alpha_{(k)}^2 \cdot c_2+ \alpha_{(k)}^3 \cdot c_3 . \]
+
+
+\subsection{Using Cantor special basis Radix-4 variant}
+
+\[\beta_{0}^{(k)}=1, \quad q_{k}(x)=x^4+x=S^2(x) \quad \text{for all } k.\]
+
+Also, 
+\[L_{k+1}=q_{k}(L_{k})= S^{2(k+1)}(\theta)+ \langle 1,\beta_{1},\dots,\beta_{m-1-2(k+1)} \rangle .\]
+
+Note that for any $i$, we have
+\[ q_k(L_{k}[4i])=q_k(L_{k}[4i+1])=q_k(L_{k}[4i+2])=q_k(L_{k}[4i+3])=L_{k+1}[i] \]
+
+For simplicity, assume that $L_{k}[4i]=w$, then we have
+\[L_{k}[4i+1]=w+1, \quad L_{k}[4i+2]=w+\beta_1 \quad L_{k}[4i+3]=w+\beta_1+1
+\]
+and also assume 
+\[L_{(k+1)}[i]=q_k(w)=q_k(w+1)=q_k(w+\beta_1)=q_k(w+\beta_1+1)=y  \]
+% $q_k(w)=q_k(w+1)=q_k(w+\beta_1)=q_k(w+\beta_1+1)=y$.
+
+Now, if we decompose $f_k(x)$ such that
+\[f_{k}(x)= g_0(q_k(x))+ xg_1(q_k(x))+ x^2g_2(q_k(x))+ x^3g_3(q_k(x)), \]
+then we have
+
+\begin{equation*}
+    \begin{aligned}
+        &
+        \begin{bmatrix}
+            f_k(w)\\
+            f_k(w+1)\\
+            f_k(w+\beta_1)\\
+            f_k(w+\beta_1+1)
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+            1 & w & w^2 & w^3 \\
+            1 & w+1 & w^2+1 & (w+1)^3 \\
+            1 & w+\beta_1 & w^2+\beta_1^2 & (w+\beta_1)^3 \\
+            1 & w+\beta_1+1 & w^2+\beta_1^2+1 & (w+\beta_1+1)^3
+        \end{bmatrix}
+        \begin{bmatrix}
+            g_0(y)\\
+            g_1(y)\\
+            g_2(y)\\
+            g_3(y)
+        \end{bmatrix}\\
+        &
+        \begin{bmatrix}
+            g_0(y)\\
+            g_1(y)\\
+            g_2(y)\\
+            g_3(y)
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+            w^3+1 & (w+1)^3+1 & (w+\beta_1)^3+1 & (w+\beta_1+1)^3+1 \\
+            w^2 & w^2+1 & w^2+\beta_1^2 & w^2+\beta_1^2+1 \\
+            w & w+1 & w+\beta_1 & w+\beta_1+1 \\
+            1 & 1 & 1 & 1
+        \end{bmatrix}
+        \begin{bmatrix}
+            f_k(w)\\
+            f_k(w+1)\\
+            f_k(w+\beta_1)\\
+            f_k(w+\beta_1+1)
+        \end{bmatrix}
+    \end{aligned}
+\end{equation*}
+
+If the verifier send $\alpha_{(k)}$ as challenge, then new codeword $f^{k+1}$ is derived from the previous codewords. The new polynomial becomes
+\[f_{k+1}(x)=g_{0}(x)+\alpha_{(k)}\cdot g_{1}(x)+ \alpha_{(k)}^2 \cdot g_{2}(x)+ \alpha_{(k)}^3 \cdot g_{3}(x). \]
+
+Therefore, the next round codeword is
+\begin{equation*}
+    \begin{aligned}
+        f_{k+1}(y)
+        &= g_{0}(y)+\alpha_{(k)}\cdot g_{1}(y)+ \alpha_{(k)}^2 \cdot g_{2}(y)+ \alpha_{(k)}^3 \cdot g_{3}(y)\\
+        &= 
+        \begin{bmatrix}
+            1 & \alpha_{(k)} & \alpha_{(k)}^2 & \alpha_{(k)}^3
+        \end{bmatrix}
+        \cdot M \cdot
+        \begin{bmatrix}
+            f_k(w)\\
+            f_k(w+1)\\
+            f_k(w+\beta_1)\\
+            f_k(w+\beta_1+1)
+        \end{bmatrix},
+    \end{aligned}
+\end{equation*}
+where
+\begin{equation*}
+    \begin{aligned}
+        M &= 
+        \begin{bmatrix}
+            w^3+1 & (w+1)^3+1 & (w+\beta_1)^3+1 & (w+\beta_1+1)^3+1 \\
+            w^2 & w^2+1 & w^2+\beta_1^2 & w^2+\beta_1^2+1 \\
+            w & w+1 & w+\beta_1 & w+\beta_1+1 \\
+            1 & 1 & 1 & 1
+        \end{bmatrix}\\
+    \end{aligned}
+\end{equation*}
+
+However, since $\beta_1^2+\beta_1=1$ or $\beta_1^3=1$, we can decompose the matrix $M$ into two more matrices $A$ and $B$ such that $M=A\cdot B$ to facilitate the exact operations to get $f_{k+1}(y)$, where
+\[ 
+A=
+\begin{bmatrix} w^3+1 & w^2 & w & 1 \\ w^2 & 0 & 1 & 0 \\ w & 1 & 0 & 0 \\ 1 & 0 & 0 & 0 \end{bmatrix}
+\quad \text{and} \quad
+B=
+\begin{bmatrix}
+1 & 1 & 1 & 1 \\
+0 & 1 & \beta_1 & \beta_1+1 \\
+0 & 1 & \beta_1+1 & \beta_1 \\
+0 & 1 & 1 & 1
+\end{bmatrix}.
+\]
+
+Now, we have
+\begin{equation*}
+    \begin{aligned}
+        U= &
+        \begin{bmatrix}
+            1 & \alpha_{(k)} & \alpha_{(k)}^2 & \alpha_{(k)}^3
+        \end{bmatrix}
+        \begin{bmatrix} 
+            w^3+1 & w^2 & w & 1 \\
+            w^2 & 0 & 1 & 0 \\ 
+            w & 1 & 0 & 0 \\ 
+            1 & 0 & 0 & 0 
+        \end{bmatrix}\\
+        &=
+        \begin{bmatrix}
+            \gamma^3+1 &~ \gamma^2 &~ \gamma &~ 1
+        \end{bmatrix}, \quad \text{where} \quad \gamma=w+\alpha_{(k)}
+    \end{aligned}
+\end{equation*}
+
+\begin{equation*}
+    \begin{aligned}
+       V &=
+       B \cdot
+       \begin{bmatrix}
+            f_k(w)\\
+            f_k(w+1)\\
+            f_k(w+\beta_1)\\
+            f_k(w+\beta_1+1)
+        \end{bmatrix}\\
+       &=
+       \begin{bmatrix}
+           f_k(w)+ f_k(w+1)+ f_k(w+\beta_1)+ f_k(w+\beta_1+1)\\
+           f_k(w+1)+ \beta_1 \cdot \{f_k(w+\beta_1)+ f_k(w+\beta_1+1) \} + f_k(w+\beta_1+1)\\
+           f_k(w+1)+ \beta_1 \cdot \{f_k(w+\beta_1)+ f_k(w+\beta_1+1) \} + f_k(w+\beta_1)\\
+           f_k(w+1)+  f_k(w+\beta_1)+ f_k(w+\beta_1+1)\\
+       \end{bmatrix}\\
+    \end{aligned}
+\end{equation*}
+
+Now, if we assume that $S= f_k(w+\beta_1)+ f_k(w+\beta_1+1)$, then this can be simply written as
+\begin{equation*}
+    \begin{aligned}
+        V &=
+        \begin{bmatrix}
+            \big\{S+ f_k(w+1) \big\}+~ f_k(w)\\
+            \big\{(\beta_1 \cdot S) + f_k(w+1) \big\} + f_k(w+\beta_1+1)\\
+           \big\{(\beta_1 \cdot S) + f_k(w+1)  \big\}+ f_k(w+\beta_1)\\
+            S+ f_k(w+1)
+        \end{bmatrix}
+    \end{aligned}
+\end{equation*}
+
+Therefore we have, 
+\begin{equation*}
+    \begin{aligned}
+        f_{k+1}(y)
+        &= U\cdot V\\
+        &= 
+        (\gamma^3+1)\cdot V[0]+ \gamma^2 \cdot V[1]+ \gamma \cdot V[2]+ V[3]\\
+        &= \gamma^3 \cdot V[0]+ \gamma^2 \cdot V[1]+ \gamma \cdot V[2] + V[0]+V[3]\\
+        &= \gamma \cdot \Big[ \gamma \cdot \big\{\gamma \cdot V[0] + V[1] \big\} + V[2] \Big] + V[0]+V[3]\\
+        &= \gamma \cdot \Big[ \gamma \cdot \big\{\gamma \cdot V[0] + V[1] \big\} + V[2] \Big] + f_{k}(w)
+    \end{aligned}
+\end{equation*}
+\vspace{1em}
+
+\noindent \textbf{\textcolor{blue}{Note:}} The FRI protocol can deploy any localization parameter $\eta$ (such as a folding factor of 4, where $\eta=2$) to aggressively compress the number of interactive rounds and Merkle tree constructions. Note that while the decomposition step in the standard generic approach of the FRI folding phase for $\eta=2$ requires 4 multiplications, it also needs 3 additional multiplications to compute the folded evaluation $f_{k+1}(y)$ by using the verifier challenge. In contrast, the proposed optimized Radix-4 folding algorithm costs \textcolor{blue}{4 multiplications in total} because the proposed algorithm does not just decompose the polynomial; it decomposes and folds it together in a single, fused step.
+
+\vspace{1em}
+
+\noindent \textbf{\textcolor{blue}{Note:}} We need only 4 multiplications and 10 additions in radix-4 FRI for each codeword in the next round, which implies $4\cdot \frac{2^m}{4}=2^m=n$ multiplications and $10\cdot \frac{2^m}{4}=\frac{5}{2}n$ additions for the first round.
+
+Therefore, the total multiplications for folding phase in radix-4 FRI
+\begin{equation*}
+    \begin{aligned}
+        =& n + \frac{n}{4}+ \frac{n}{4^2}+ \cdots + 4\\
+        =& \frac{4(n-1)}{3}
+    \end{aligned}
+\end{equation*}
+
+and total additions for folding phase in radix-4 FRI
+\begin{equation*}
+    \begin{aligned}
+        =& \frac{5}{2} \big[n + \frac{n}{4}+ \frac{n}{4^2}+ \cdots + 4 \big]\\
+        =& \frac{10(n-1)}{3}.
+    \end{aligned}
+\end{equation*}
+
+% $4\cdot \frac{1}{4}2^m\cdot \frac{m}{2}=\frac{1}{2}2^m m$ multiplications and $10\cdot \frac{1}{4}2^m\cdot \frac{m}{2}=\frac{5}{4}2^m m$ additions
+
+
+% \begin{algorithm}
+% \caption{Optimized Radix-4 FRI Folding Step\\ (\textcolor{red}{I will remove the cost analysis later}) }
+% \label{alg:fri_folding}
+% \begin{algorithmic}[1]
+% \Require Evaluations from previous round: $v_0 = f_k(w), v_1 = f_k(w+1), v_2 = f_k(w+\beta_1), v_3 = f_k(w+\beta_1+1)$
+% \Require Protocol constants: Challenge $\alpha_{(k)}$
+% \Ensure Next round evaluation: $f_{k+1}(y)$
+
+% \Statex \Comment{\textbf{Phase 1}}
+% \State $\gamma \gets w + \alpha_{(k)}$ \Comment{1 Addition}
+
+% \Statex \Comment{\textbf{Phase 2}}
+% \State $S \gets v_2 + v_3$ \Comment{1 Addition}
+% \State $T_3 \gets S + v_1$ \Comment{1 Addition}
+% \State $V[0] \gets T_3 + v_0$ \Comment{1 Addition}
+% \State $T_1 \gets \beta_1 \cdot S$ \Comment{1 Multiplication}
+% \State $T_2 \gets T_1 + v_1$ \Comment{1 Addition}
+% \State $V[1] \gets T_2 + v_3$ \Comment{1 Addition}
+% \State $V[2] \gets T_2 + v_2$ \Comment{1 Addition}
+
+% \Statex \Comment{\textbf{Phase 3: Horner Evaluation}}
+% \State $H_1 \gets \gamma \cdot V[0]$ \Comment{1 Multiplication}
+% \State $H_2 \gets H_1 + V[1]$ \Comment{1 Addition}
+% \State $H_3 \gets \gamma \cdot H_2$ \Comment{1 Multiplication}
+% \State $H_4 \gets H_3 + V[2]$ \Comment{1 Addition}
+% \State $H_5 \gets \gamma \cdot H_4$ \Comment{1 Multiplication}
+
+% \Statex \Comment{\textbf{Final Substitution}}
+% \State $f_{k+1}(y) \gets H_5 + v_0$ \Comment{1 Addition}
+
+% \State \Return $f_{k+1}(y)$
+% \end{algorithmic}
+% \end{algorithm}
+
+\begin{algorithm}[H]
+    \caption{Optimized Radix-4 FRI Folding Step}
+    \label{alg:fri_folding}
+    \SetAlgoLined
+    { \scriptsize
+    \KwIn{Evaluations from previous round: $v_0 = f_k(w), v_1 = f_k(w+1), v_2 = f_k(w+\beta_1), v_3 = f_k(w+\beta_1+1)$ and verifier Challenge $\alpha_{(k)}$}
+    \KwOut{Next round codeword $f_{k+1}(y)$}
+
+    \tcc{Phase 1}
+    $\gamma \gets w + \alpha_{(k)}$\;
+
+    \tcc{Phase 2}
+    $S \gets v_2 + v_3$\;
+    $T_3 \gets S + v_1$\;
+    $V[0] \gets T_3 + v_0$\;
+    $T_1 \gets \beta_1 \cdot S$\;
+    $T_2 \gets T_1 + v_1$\;
+    $V[1] \gets T_2 + v_3$\;
+    $V[2] \gets T_2 + v_2$\;
+
+    \tcc{Phase 3: Horner Evaluation}
+    $H_1 \gets \gamma \cdot V[0]$\;
+    $H_2 \gets H_1 + V[1]$\;
+    $H_3 \gets \gamma \cdot H_2$\;
+    $H_4 \gets H_3 + V[2]$\;
+    $H_5 \gets \gamma \cdot H_4$\;
+
+    \tcc{Final Substitution}
+    $f_{k+1}(y) \gets H_5 + v_0$\;
+
+    \Return $f_{k+1}(y)$\;
+    }
+\end{algorithm}
+
+
+\begin{algorithm}[H]
+    \caption{FRI Commit Phase ($\eta=2$)}
+    \label{alg:fri_commit}
+    \SetAlgoLined
+    { \scriptsize
+    \KwIn{Initial evaluations $f^{(0)}$ over domain $L_0$}
+    \KwOut{Sequence of evaluations $f^{(0)}, \dots, f^{(r)}$ and Merkle roots $root_0, \dots, root_r$}
+
+    $k \gets 0$\;
+    $root_0 \gets \text{MerkleCommit}(f^{(0)})$\;
+    Send $root_0$ to Verifier\;
+    
+    \While{$|L_k| > 1$}
+    {
+        Receive uniformly random challenge $\alpha^{(k)} \in \mathbb{F}$ from Verifier\;
+        Initialize $f^{(k+1)}$ as an empty array\;
+        $N_{cosets} \gets |L_k| / 4$\;
+        
+        \For{$i = 0$ \KwTo $N_{cosets} - 1$}
+        {
+            $w \gets L_k[4i]$ \tcp*{Base domain point for coset $i$}
+            $v_0, v_1, v_2, v_3 \gets \text{GetCosetEvaluations}(f^{(k)}, i)$\;
+            $f^{(k+1)}[i] \gets \text{\textbf{Radix-4 Fold}}(v_0, v_1, v_2, v_3, \alpha^{(k)})$\;
+        }
+        
+        $L_{k+1} \gets \text{Image of } L_k \text{ under $q_k(x)$}$\;
+        $root_{k+1} \gets \text{MerkleCommit}(f^{(k+1)})$\;
+        Send $root_{k+1}$ to Verifier\;
+        $k \gets k + 1$\;
+    }
+    \Return $(f^{(0)}, \dots, f^{(r)}), (root_0, \dots, root_r)$\;
+    }
+\end{algorithm}
+
+
+\begin{algorithm}[H]
+    \caption{FRI Query Phase and Round Consistency Check ($\eta=2$)}
+    \label{alg:fri_verify}
+    \SetAlgoLined
+    { \scriptsize
+    \KwIn{Merkle roots $root_0, \dots, root_{r-1}$, challenges $\alpha^{(0)}, \dots, \alpha^{(r-1)}$, final codeword $f^{(r)}$, number of queries $N_q$}
+    \KwOut{\textbf{Accept} or \textbf{Reject}}
+    
+    \tcc{Final Codeword Degree Check}
+    Compute the interpolant $f_r(x)$ from the points in $f^{(r)}$\;
+    \If{$\text{deg}(f_r(x)) > \rho \cdot |L_r| - 1$}
+    {
+        \Return \textbf{Reject}\;
+    }
+
+    \tcc{Neighboring Codeword Consistency Check}
+    Initialize empty set $Q = \emptyset$ \tcp*{To track repeated terminal indices}
+
+    \For{$q = 1$ \KwTo $N_q$}
+    {
+        \tcc{Sample path and enforce non repetition condition}
+        \Repeat{$s^{(r)} \notin Q$}
+        {
+            Sample random index $s^{(0)} \in \{0, \dots, |L_0|-1\}$\;
+            \For{$k = 0$ \KwTo $r - 1$}
+            {
+                $s^{(k+1)} \gets \lfloor s^{(k)} / 4 \rfloor$\;
+            }
+        }
+        $Q \gets Q \cup \{s^{(r)}\}$\;
+        
+        \For{$k = r - 1$ \KwDownTo $0$}
+        {
+            $I_k \gets \text{GetCosetIndices}(s^{(k+1)})$ \tcp*{Find the 4 points mapping to target $s^{(k+1)}$}
+            $w \gets L_k[I_k]$\;
+            $v_0, v_1, v_2, v_3 \gets \text{QueryProverForEvaluations}(k, I_k)$\;
+            $paths \gets \text{QueryProverForMerklePaths}(k, I_k)$\;
+            
+            \eIf{$k == r - 1$}
+            {
+                $f_{expected} \gets f^{(r)}[s^{(r)}]$\;
+            }
+            {
+                $f_{expected} \gets \text{QueryProverForEvaluations}(k+1, s^{(k+1)})$\;
+            }
+            
+            \tcc{Data Authentication}
+            \If{\textbf{not} $\text{VerifyMerklePaths}(root_k, v_0, v_1, v_2, v_3, paths)$}
+            {
+                \Return \textbf{Reject}\;
+            }
+            
+            \tcc{Round Consistency Check}
+            $f_{computed} \gets \text{\textbf{Radix-4 Fold}}(v_0,v_1,v_2,v_3,\alpha^{(k)})$\;
+            \If{$f_{computed} \neq f_{expected}$}
+            {
+                \Return \textbf{Reject}\;
+            }
+        }
+    }
+    \Return \textbf{Accept}\;
+    }
+\end{algorithm}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Revisiting Additive FFT}
+Now we will discuss the evaluation of a univariate polynomial $f(x)$ over the subspace $W_m$. The evaluation of $f(x)$ at the points $\eta_0, \eta_1, \ldots, \eta_{2^m-1}$ is given by 
+\begin{equation*}
+    \hat{f} = \left( f(\eta_0), f(\eta_1), \ldots, f(\eta_{2^m-1}) \right).
+\end{equation*}
+This set of evaluations is referred to as the additive discrete Fourier transform (DFT) of $f(x)$ over the subspace $W_m$. We sometimes refer to the vector $\hat{f}$ as the \textit{discrete Fourier transform of length $n=2^m$} for the function $f(x)$, denoted by $\dft(f, W_m)$. \textit{The additive FFT} is an efficient method for computing $\dft(f, W_m)$, which we will denote as $\fft(f, W_m)$.
+
+
+\subsection{The Radix-4 Cantor AFFT}
+
+The evaluation of a polynomial $f(x)$ of degree less than $n = 2^m$ over the subspace $W_m$ using Cantor's algorithm is valid only when $W_m$ is a subspace of the field (or subfield) $\mathbb{F}_{2^r}$, where $r = 2^\ell$. Cantor introduced a special basis to facilitate the efficient evaluation of $f(x)$.
+
+\paragraph{The Cantor Special Basis}
+Consider the function $S:\mathbb{F}_{2^r} \rightarrow \mathbb{F}_{2^r}$ defined by $S(x)=x^2+x$, and let the following sequence of functions be defined recursively: $S^{0}(x)=x$ and $S^{m}(x)=S(S^{m-1}(x))$.
+% \[S^{0}(x)=x \quad \text{ and } \quad S^{m}(x)=S(S^{m-1}(x)).\]
+A nonrecursive formula for $S^m(x)$ is $$S^{m}(x)=\sum_{i=0}^{m} \binom{m}{i} x^{2^i},$$ where $\binom{m}{i}$ denotes the binomial coefficient reduced modulo 2. For $m=2^{t}$, we have $S^{2^{t}}=x^{2^{2^{t}}}+x$. The \textit{Cantor special basis} $\set{\beta_{0},\beta_{1},\ldots,\beta_{m-1}}$ for the subspace $W_{m}$ is defined as $S(\beta_{i})=\beta_{i-1}$ for $i=1,\ldots,m-1$ with $\beta_{0}=1$. With this basis, we have $S^{i}(\beta_{i})=1$ for $i=0, 1, \ldots, m-1$. Consequently, in the context of the Cantor special basis, the vanishing polynomial of the subspaces simplifies to $\mathbb{Z}_{W_{i}}(x)=S^{i}(x) \text{ for } i=0,1,\ldots,m$.
+
+
+\noindent We can decompose $\theta+W_m$ into four disjoint affine subspaces $\theta+W_{m-2}$, $\theta+\beta_{m-2}+ W_{m-2}$, $\theta+\beta_{m-1}+ W_{m-1}$, and $\theta+\beta_{m-1}+\beta_{m-2}+ W_{m-1}$.
+
+Now, if we divide $f(x)$ by $S^{m-1}(x)$, we will get
+\[f(x) = r(x) + q(x) \cdot S^{m-1}(x), \]
+where both $r(x)$ and $q(x)$ has degree less than $2^{m-1}$. Next, we will divide both $r(x)$ and $q(x)$ by $S^{m-2}(x)$. If we have $r(x) = f_0(x) + f_1(x) \cdot S^{m-2}(x)$ and $q(x) = f_2(x) + f_3(x) \cdot S^{m-2}(x)$, we can write
+\[ f(x)= f_0(x)+ S^{m-2}(x)f_1(x)+  S^{m-1}(x)f_2(x)+ S^{m-2}(x)S^{m-1}(x)f_3(x). \]
+
+Now, if we assume $T_1 = S^{m-2}(\theta), \qquad T_2 = S^{m-1}(\theta)$, then we have
+
+\begin{equation*}
+    f(x) =
+    \begin{cases}
+        \begin{aligned}
+            &f_0(x) + T_1\cdot f_1(x) + T_2 \cdot f_2(x) + T_1T_2 \cdot f_3(x)
+        \end{aligned} & \text{if } x \in \theta+W_{m-2} \\[3ex]
+        %
+        \begin{aligned}
+            &f_0(x) + (T_1+1)\cdot f_1(x) + T_2 \cdot f_2(x) \\[-0.5ex]
+            &\quad + (T_1+1)T_2 \cdot f_3(x)
+        \end{aligned} & \text{if } x \in \theta+\beta_{m-2}+W_{m-2} \\[3ex]
+        %
+        \begin{aligned}
+            &f_0(x) + (T_1+\beta_1)\cdot f_1(x) + (T_2+1) \cdot f_2(x) \\[-0.5ex]
+            &\quad + (T_1+\beta_1)(T_2+1) \cdot f_3(x)
+        \end{aligned} & \text{if } x \in \theta+\beta_{m-1}+W_{m-2} \\[3ex]
+        %
+        \begin{aligned}
+            &f_0(x) + (T_1+\beta_1+1) \cdot f_1(x) + (T_2+1)\cdot f_2(x) \\[-0.5ex]
+            &\quad + (T_1+\beta_1+1)(T_2+1) \cdot f_3(x)
+        \end{aligned} & \text{if } x \in \theta+\beta_{m-1}+\beta_{m-2}+W_{m-2}.
+    \end{cases}
+\end{equation*}
+
+If $h_0 = f\big|_{\theta+W_{m-2}}$, $h_1 = f\big|_{\theta+\beta_{m-2}+W_{m-2}}$, $h_2=f\big|_{\theta+\beta_{m-1}+W_{m-2}}$, and $h_3=f\big|_{\theta+\beta_{m-1}+\beta_{m-2}+W_{m-2}}$, then the above expressions can be simply written as
+\begin{equation*}
+    \begin{aligned}
+        \begin{bmatrix}
+            h_0(x)\\h_1(x)\\h_2(x)\\h_3(x)
+        \end{bmatrix} &=
+        \begin{bmatrix}
+            1 & T_1 & T_2 & T_1 T_2\\
+            1 & T_1+1 & T_2 & (T_1+1)T_2\\
+            1 & T_1+\beta_1 & T_2+1 & (T_1+\beta_1)(T_2+1)\\
+            1 & T_1+\beta_1+1 & T_2+1 & (T_1+\beta_1+1)(T_2+1)
+        \end{bmatrix}
+        \begin{bmatrix}
+            f_0(x)\\f_1(x)\\f_2(x)\\f_3(x)
+        \end{bmatrix}
+    \end{aligned}
+\end{equation*}
+
+However, we can decompose the matrix into two sparse matrices that will help us to reduce the addition and multiplication cost. More specifically, we can write
+\begin{equation*}
+    \begin{aligned}
+        &
+       \begin{bmatrix}
+            1 & T_1 & T_2 & T_1 T_2\\
+            1 & T_1+1 & T_2 & (T_1+1)T_2\\
+            1 & T_1+\beta_1 & T_2+1 & (T_1+\beta_1)(T_2+1)\\
+            1 & T_1+\beta_1+1 & T_2+1 & (T_1+\beta_1+1)(T_2+1)
+        \end{bmatrix}\\
+        =& 
+        \begin{bmatrix}
+            1 & T_1 & 0 & 0\\
+            1 & T_1+1 & 0 & 0\\
+            0 & 0 & 1 & T_1+\beta_1\\
+            0 & 0 & 1 & T_1+\beta_1+1
+        \end{bmatrix}
+        \begin{bmatrix}
+            1 & 0 & T_2 & 0\\
+            0 & 1 & 0 & T_2\\
+            1 & 0 & T_2+1 & 0\\
+            0 & 1 & 0 & T_2+1
+        \end{bmatrix}
+    \end{aligned}
+\end{equation*}
+
+Thus, if $u_0(x) = f_0(x) + T_2 \cdot f_2(x)$, $u_1(x) = f_1(x) + T_2 \cdot f_3(x)$, $u_2(x) = u_0(x) + f_2(x)$ and $u_3(x) = u_1(x) + f_3(x)$, we can write
+\begin{equation*}
+    \begin{aligned}
+        h_0(x) &= u_0(x) + T_1 \cdot u_1(x) && h_1(x) = h_0(x) + u_1(x)\\
+        h_2(x) &= u_2(x) + T_3 \cdot u_3(x) && h_3(x) = h_2(x) + u_3(x),
+    \end{aligned}
+\end{equation*}
+where $T_3 = T_1 + \beta_1$.
+
+% \[
+% \begin{bmatrix}
+%     1 & T_1 & T_2 & T_1 T_2\\
+%     1 & T_1+1 & T_2 & (T_1+1)T_2\\
+%     1 & T_1+\beta_1 & T_2+1 & (T_1+\beta_1)(T_2+1)\\
+%     1 & T_1+\beta_1+1 & T_2+1 & (T_1+\beta_1+1)(T_2+1)
+% \end{bmatrix}
+% =
+% \begin{bmatrix}
+%     1 & 0 & T_2 & 0\\
+%     0 & 1 & 0 & T_2\\
+%     1 & 0 & T_2+1 & 0\\
+%     0 & 1 & 0 & T_2+1
+% \end{bmatrix}
+% \begin{bmatrix}
+%     1 & T_1 & 0 & 0\\
+%     1 & T_1+1 & 0 & 0\\
+%     0 & 0 & 1 & T_1+\beta_1\\
+%     0 & 0 & 1 & T_1+\beta_1+1
+% \end{bmatrix}
+% \]
+
+
+\begin{algorithm}[H]
+    \caption{Cantor AFFT of length $n = 2^m$ with $m=2z$}\label{Algo:CantorRadix4}
+    \SetAlgoLined
+    { \scriptsize
+    \KwIn{$f(x) \in \mathbb{F}_{2^r}[x]$ of degree $< n = 2^m$, where $k=2^{\ell}$ and the affine subspace $\theta+W_m=\theta+ \langle \beta_0,\beta_1,\ldots,\beta_{m-1} \rangle$, where $\{\beta_0=1,\beta_1,\ldots,\beta_{m-1}\}$ is a Cantor special basis.}
+    \KwOut{$\fft(f, \theta+W_m)$.}
+
+    \If{$z=0$}
+    {
+        \Return $f(\theta)$\;
+    }
+    
+    Let $T_1 = S^{m-2}(\theta), \quad T_2= S^{m-1}(\theta), \quad \text{and} \quad T_3 = T_1 + \beta_1$ \tcp*{Precomputing the scalars}
+
+    \tcc{Phase 1: The Divisions}
+    $f(x) = r(x) + q(x) \cdot S^{m-1}(x)$\;
+    $r(x) = f_0(x) + f_1(x) \cdot S^{m-2}(x)$\;
+    $q(x) = f_2(x) + f_3(x) \cdot S^{m-2}(x)$\;
+
+    \tcc{Phase 2: First Stage}
+    $u_0(x) \gets f_0(x) + T_2 \cdot f_2(x)$\;
+    %overwrite buffer of f0
+    $u_2(x) \gets u_0(x) + f_2(x)$\;
+    %overwrite buffer of f2
+    $u_1(x) \gets f_1(x) + T_2 \cdot f_3(x)$\;
+    %overwrite buffer of f1
+    $u_3(x) \gets u_1(x) + f_3(x)$\;
+    %overwrite buffer of f3
+    
+    \tcc{Phase 3: Second Stage}
+    $h_0(x) \gets u_0(x) + T_1 \cdot u_1(x)$\;
+    %overwrite u0
+    $h_1(x) \gets h_0(x) + u_1(x)$\;
+    %overwrite u1
+    $h_2(x) \gets u_2(x) + T_3 \cdot u_3(x)$\;
+    %overwrite u2
+    % $T_3 \gets T_1 + \beta_1$ \tcp*{Precomputing the scalar addition}
+    $h_3(x) \gets h_2(x) + u_3(x)$\;
+    %overwrite u3
+    
+    \Return $\fft(h_0,\theta+W_{m-2})||\fft(h_1, \theta+\beta_{m-2}+ W_{m-1})||\fft(h_2, \theta+\beta_{m-1}+ W_{m-1})||\fft(h_3, \theta+\beta_{m-1}+\beta_{m-2}+ W_{m-1})$\;
+    }
+\end{algorithm}
+
+\begin{remark}
+    It is important to note that when $n$ is a power of two but not a power of four (such as $n=128$ or $n=512$, we can utilize a mixed-radix architecture. This approach processes as many radix-4 stages as possible to maximize computational efficiency, and then performs a single radix-2 stage to handle the remaining factor of two. This design yields the throughput and memory access benefits of radix-4 without rigidly restricting our input constraints $n$.
+\end{remark}
+
+
+\noindent \textbf{\textcolor{blue}{Note:} Cost in radix-4 Cantor AFFT is same as radix-2 Cantor AFFT, even in the subspace, i.e., $\theta=0$}
+
+
+
+
+
+
+
+\subsection{The Radix-4 LCH AFFT}
+
+The LCH FFT requires that the evaluated polynomial is converted into a particular kind of basis, called the novel polynomial basis~\cite{LCH-basis2014}. The novel polynomial basis for polynomials must be distinguished from bases for fields. Although the LCH FFT is independent of the underlying basis of the finite field, we assume that the field is in Cantor basis for simplicity.
+
+\begin{definition}
+    Given the Cantor special basis $B=\set{1,\beta_1,\ldots,\beta_{m-1}}$ for the base field and its vanishing polynomials $(s_i)$, define the novel polynomial basis with respect to $B$ to be the polynomials $(X_k)$
+    \[ X_k(x) := \prod_{i=0}^{m-1} (S^i(x))^{b_i}, \]
+    where $k = \sum b_i 2^i$ with $b_i \in \{0, 1\}$.
+\end{definition}
+
+Thus, $X_k(x)$ is the product of all $S^i(x)$ where the $i$-th bit of $k$ is one. Since $\deg(S^i(x)) = 2^i$, we can say that $\deg(X_k(x)) = k$ for $k=0,1,\ldots,n-1$.
+
+\noindent To perform LCH FFT, the evaluated polynomial $f(x)$ has to be converted into the form $f(x) = g(X) = g_0 + g_1X_1(x) + \cdots + g_{n-1}X_{n-1}(x)$.
+
+
+\begin{algorithm}[H]
+    \caption{LCH AFFT of length $n = 2^m$ with $m=2z$}\label{Algo:LCHRadix4}
+    \SetAlgoLined
+    { \scriptsize
+    \KwIn{$f(x) \in \mathbb{F}_{2^r}[x]$ of degree $< n = 2^m$, where $k=2^{\ell}$ and the affine subspace $\theta+W_m=\theta+ \langle \beta_0,\beta_1,\ldots,\beta_{m-1} \rangle$, where $\{\beta_0=1,\beta_1,\ldots,\beta_{m-1}\}$ is a Cantor special basis.}
+    \KwOut{$\fft(f, \theta+W_m)$.}
+
+    \If{$z=0$}
+    {
+        \Return $f(\theta)$\;
+    }
+    
+    \tcc{Phase 1: Basis Conversion and Decomposition}
+    $g(X) \gets g_0 + g_1 X_1(x) + \dots + g_{n-1} X_{n-1}(x) \leftarrow \text{Basis conversion}(f(x))$\;
+    % Let $T_1 = S^{m-2}(\theta)$ and $T_2= S^{m-1}(\theta)$\;
+    $g(X) \gets f_0(X) + X_{2^{m-2}}(x) \cdot f_1(X) + X_{2^{m-1}}(x) \cdot f_2(X) + X_{2^{m-2}}(x) X_{2^{m-1}}(x) \cdot f_3(X)$\;
+
+    Let $T_1 = X_{2^{m-2}}(\theta), \quad T_2= X_{2^{m-1}}(\theta), \quad \text{and} \quad T_3 = T_1 + \beta_1$ \tcp*{Precomputing the scalars}
+
+    \tcc{Phase 2: First Stage Butterfly}
+    $u_0(X) \gets f_0(X) + T_2 \cdot f_2(X)$\;
+    $u_2(X) \gets u_0(X) + f_2(X)$\;
+    $u_1(X) \gets f_1(X) + T_2 \cdot f_3(X)$\;
+    $u_3(X) \gets u_1(X) + f_3(X)$\;
+    
+    \tcc{Phase 3: Second Stage Butterfly}
+    $h_0(X) \gets u_0(X) + T_1 \cdot u_1(X)$\;
+    $h_1(X) \gets h_0(X) + u_1(X)$\;
+    $h_2(X) \gets u_2(X) + T_3 \cdot u_3(X)$\;
+    $h_3(X) \gets h_2(X) + u_3(X)$\;
+    
+    \Return $\fft(h_0,\theta+W_{m-2})||\fft(h_1, \theta+\beta_{m-2}+ W_{m-1})||\fft(h_2, \theta+\beta_{m-1}+ W_{m-1})||\fft(h_3, \theta+\beta_{m-1}+\beta_{m-2}+ W_{m-1})$\;
+    }
+\end{algorithm}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{remark}
+    It is important to note that when $n$ is a power of two but not a power of four (such as $n=128$ or $n=512$, we can utilize a mixed-radix architecture. This approach processes as many radix-4 stages as possible to maximize computational efficiency, and then performs a single radix-2 stage to handle the remaining factor of two. This design yields the throughput and memory access benefits of radix-4 without rigidly restricting our input constraints $n$.
+\end{remark}
+
+
+\noindent \textbf{\textcolor{blue}{Note:} Cost in radix-4 LCH AFFT is same as radix-2 LCH AFFT, even in the subspace, i.e., $\theta=0$}
+
+
+
+
+\begin{algorithm}[H]
+    \caption{Cantor AFFT of Radix-$2^k$}\label{Algo:Cantor_Radix-k}
+    \SetAlgoLined
+    { \scriptsize
+    \KwIn{$f(x) \in \mathbb{F}_{2^r}[x]$ of degree $< n = 2^m$ with $m=kz$, where $r=2^{\ell}$ and the affine subspace $\theta+W_m=\theta+ \langle \beta_0,\beta_1,\ldots,\beta_{m-1} \rangle$, where $\{\beta_0=1,\beta_1,\ldots,\beta_{m-1}\}$ is a Cantor special basis.}
+    \KwOut{$\fft(f, \theta+W_m)$.}
+
+    \If{$z=0$}
+    {
+        \Return $f(\theta)$\;
+    }
+    
+    \tcc{Phase 1: The Divisions}
+$f_0^{(0)}(x) \gets f(x)$\;
+
+\For{$j \gets 1$ \KwTo $k$}{
+    \For{$i \gets 0$ \KwTo $2^{j-1}-1$}{
+        \tcp{Divide the $i$-th polynomial of the previous layer by $S^{m-j}(x)$}
+        $f_i^{(j-1)}(x) = r(x) + q(x)\cdot S^{m-j}(x)$\;
+        $f_{2i}^{(j)}(x) \gets r(x)$\;
+        $f_{2i+1}^{(j)}(x) \gets q(x)$\;
+    }
+}
+
+% \tcc{Initialize the butterfly buffer}
+\For{$i \gets 0$ \KwTo $2^k-1$}{
+    $g_i(x) \gets f_i^{(k)}(x)$\;
+}
+
+\tcc{Phase 2: The $k$ Stages}
+\For{$j \gets 1$ \KwTo $k$}{
+    \tcp{Stage $j$ applies the shift constants for $S^{m-j}(x)$}
+    
+    \For{$b \gets 0$ \KwTo $2^{j-1}-1$}{
+        \tcp{Compute the affine offset for block $b$ ($b_\ell$ is the $\ell$-th bit of $b$)}
+        $\alpha_{j,b} \gets \theta$\;
+        
+        \For{$\ell \gets 0$ \KwTo $j-2$}{
+            \If{$b_\ell = 1$}{
+                $\alpha_{j,b} \gets \alpha_{j,b} + \beta_{m-j+1+\ell}$\;
+            }
+        }
+
+        \tcp{Precompute the scalar for this block}
+        $T_{j,b} \gets S^{m-j}(\alpha_{j,b})$\;
+
+        \For{$i \gets 0$ \KwTo $2^{k-j}-1$}{
+            $i_0 \gets b\cdot 2^{k-j+1} + i$\;
+            $i_1 \gets i_0 + 2^{k-j}$\;
+
+            % \tcp{Save old values for in-place update}
+            $v_0(x) \gets g_{i_0}(x)$\;
+            $v_1(x) \gets g_{i_1}(x)$\;
+
+            $g_{i_0}(x) \gets v_0(x) + T_{j,b}\cdot v_1(x)$\;
+            $g_{i_1}(x) \gets g_{i_0}(x) + v_1(x)$\;
+        }
+    }
+}
+
+\tcc{The final coset polynomials}
+\For{$a \gets 0$ \KwTo $2^k-1$}{
+    $h_a(x) \gets g_a(x)$\;
+}
+
+\tcc{Phase 3: Recursive AFFT Calls on the $2^k$ Cosets}
+\For{$a \gets 0$ \KwTo $2^k-1$}{
+    $\theta_a \gets \theta$\;
+    
+    \tcp{$a_\ell$ is the $\ell$-th bit of $a$}
+    \For{$\ell \gets 0$ \KwTo $k-1$}{
+        \If{$a_\ell = 1$}{
+            $\theta_a \gets \theta_a + \beta_{m-k+\ell}$\;
+        }
+    }
+
+    $y_a \gets \text{AFFT}(h_a(x), \theta_a + W_{m-k})$\;
+}
+
+\Return $y_0 \Vert y_1 \Vert \cdots \Vert y_{2^k-1}$\;
+
+    }
+\end{algorithm}
+
+
+
+
+
+% \medskip
+
+\bibliographystyle{plain}
+\bibliography{Refined_Ref,biblio}
+\end{document}

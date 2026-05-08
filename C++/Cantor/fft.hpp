@@ -38,6 +38,14 @@ std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
                                         const libiop::affine_subspace<FieldT> &domain);
 
 template<typename FieldT>
+std::vector<FieldT> additive_FFT_radix4(const std::vector<FieldT> &poly_coeffs,
+                                        const libiop::affine_subspace<FieldT> &domain);
+
+template<size_t K, typename FieldT>
+std::vector<FieldT> additive_FFT_radix2k(const std::vector<FieldT> &poly_coeffs,
+                                         const libiop::affine_subspace<FieldT> &domain);
+
+template<typename FieldT>
 std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &evals,
                                         const libiop::affine_subspace<FieldT> &domain);
 

@@ -283,17 +283,17 @@ affine_subspace<FieldT> field_subset<FieldT>::subspace() const
 template<typename FieldT>
 FieldT field_subset<FieldT>::generator() const
 {
-    assert(this->type_ == multiplicative_coset_type);
-
-    return this->coset_->generator();
+    // Multiplicative coset support is stripped from this tree (`coset_` omitted).
+    assert(this->type_ == affine_subspace_type);
+    (void)this->subspace_;
+    return FieldT::zero();
 }
 
 template<typename FieldT>
 const FieldT field_subset<FieldT>::shift() const
 {
-
-    return this->type_ == multiplicative_coset_type? 
-        this->coset_->shift() : this->subspace_->shift();
+    assert(this->type_ == affine_subspace_type);
+    return this->subspace_->shift();
 }
 
 template<typename FieldT>
@@ -312,7 +312,7 @@ bool field_subset<FieldT>::operator==(const field_subset<FieldT> &other) const
         case affine_subspace_type:
             return this->subspace_ == other.subspace_;
         case multiplicative_coset_type:
-            return this->coset_ == other.coset_;
+            return false;
         default:
             return false;
     }

@@ -79,3 +79,24 @@ target_link_libraries(
     ff
     benchmark::benchmark
 )
+
+# Perf driver: minimal wrapper used with `perf stat` to measure
+# cache-miss / cycle counts of individual FFT variants without
+# Google Benchmark's iteration harness in the way.
+add_executable(perf_driver perf_driver.cpp)
+
+target_include_directories(
+    perf_driver
+
+    PRIVATE
+    depends/libff
+    ${LIBSODIUM_INCLUDE_DIRS}
+    .
+)
+
+target_link_libraries(
+    perf_driver
+    PRIVATE
+    ${LIBSODIUM_LIBRARIES}
+    ff
+)
