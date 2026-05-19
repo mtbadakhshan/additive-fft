@@ -24,6 +24,13 @@ endif()
 
 cmake_print_variables(CMAKE_BUILD_TYPE)
 
+find_package(OpenMP COMPONENTS CXX)
+if(OpenMP_CXX_FOUND)
+    message(STATUS "OpenMP CXX found: parallel Cantor FFT enabled")
+else()
+    message(STATUS "OpenMP CXX not found: additive_FFT_parallel falls back to additive_FFT")
+endif()
+
 # Find the pkg-config package
 find_package(PkgConfig REQUIRED)
 
@@ -58,6 +65,9 @@ target_link_libraries(
     ${LIBSODIUM_LIBRARIES}
     ff
 )
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(main PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 # Benchmark executable
 add_executable(run_benchmark benchmark.cpp)
@@ -79,6 +89,9 @@ target_link_libraries(
     ff
     benchmark::benchmark
 )
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(run_benchmark PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 # Perf driver: minimal wrapper used with `perf stat` to measure
 # cache-miss / cycle counts of individual FFT variants without
@@ -100,3 +113,6 @@ target_link_libraries(
     ${LIBSODIUM_LIBRARIES}
     ff
 )
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(perf_driver PRIVATE OpenMP::OpenMP_CXX)
+endif()

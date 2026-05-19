@@ -18,6 +18,10 @@
 #include "LCH/fft.hpp"
 #include "Gao/fft.hpp"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 template <typename T>
 bool check_equal(const std::vector<T> &v1, const std::vector<T> &v2)
 {
@@ -326,6 +330,49 @@ void test_LCH_radix2k_correctness(){
     std::cout << (all_passed ? "ALL PASS" : "SOME FAILED") << std::endl;
 }
 
+// Strategy A: LCH parallel butterflies vs radix-2 baseline.
+void test_LCH_parallel_correctness()
+{
+    typedef libff::gf256 FieldT;
+    const std::vector<unsigned> ms = {6, 8, 9, 10, 12, 14, 15, 16};
+    bool all_passed = true;
+
+    for (unsigned m : ms) {
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+        const auto baseline = lch::additive_FFT<FieldT>(poly_coeffs, m, m);
+
+#ifdef _OPENMP
+        const std::vector<int> thread_counts = {1, 2, 4, 8};
+        for (int t : thread_counts) {
+            omp_set_num_threads(t);
+            const auto pr2  = lch::additive_FFT_parallel<FieldT>(poly_coeffs, m, m);
+            const auto pr4  = lch::additive_FFT_radix4_parallel<FieldT>(poly_coeffs, m, m);
+            const auto pk2  = lch::additive_FFT_radix2k_parallel<2, FieldT>(poly_coeffs, m, m);
+            const auto pk3  = lch::additive_FFT_radix2k_parallel<3, FieldT>(poly_coeffs, m, m);
+            const auto pk4  = lch::additive_FFT_radix2k_parallel<4, FieldT>(poly_coeffs, m, m);
+            const bool ok2  = check_equal<FieldT>(baseline, pr2);
+            const bool ok4  = check_equal<FieldT>(baseline, pr4);
+            const bool okk2 = check_equal<FieldT>(baseline, pk2);
+            const bool okk3 = check_equal<FieldT>(baseline, pk3);
+            const bool okk4 = check_equal<FieldT>(baseline, pk4);
+            all_passed      = all_passed && ok2 && ok4 && okk2 && okk3 && okk4;
+            std::cout << "m=" << m << "  threads=" << t << "  r2_par:" << (ok2 ? "PASS" : "FAIL")
+                      << "  r4_par:" << (ok4 ? "PASS" : "FAIL") << "  r2k2_par:" << (okk2 ? "PASS" : "FAIL")
+                      << "  r2k3_par:" << (okk3 ? "PASS" : "FAIL") << "  r2k4_par:" << (okk4 ? "PASS" : "FAIL")
+                      << std::endl;
+        }
+#else
+        const auto pr2 = lch::additive_FFT_parallel<FieldT>(poly_coeffs, m, m);
+        const auto pk4 = lch::additive_FFT_radix2k_parallel<4, FieldT>(poly_coeffs, m, m);
+        const bool ok  = check_equal<FieldT>(baseline, pr2) && check_equal<FieldT>(baseline, pk4);
+        all_passed     = all_passed && ok;
+        std::cout << "m=" << m << "  (no OpenMP) parallel aliases: " << (ok ? "PASS" : "FAIL") << std::endl;
+#endif
+    }
+
+    std::cout << (all_passed ? "LCH parallel ALL PASS" : "SOME FAILED") << std::endl;
+}
+
 // Correctness check: lch::additive_FFT_radix4 against the radix-2 baseline
 // across several (m, n_poly, shift_dim) configurations, including:
 //   * odd log_n (exercises the residual radix-2 stage),
@@ -416,8 +463,196 @@ void test_radix2k_correctness(){
     std::cout << (all_passed ? "ALL PASS" : "SOME FAILED") << std::endl;
 }
 
+// Strategy A (parallel modules): cantor::additive_FFT_parallel vs radix-2 baseline.
+void test_additive_fft_parallel_correctness()
+{
+    typedef libff::gf256 FieldT;
+    const std::vector<size_t> ms = {4, 5, 6, 8, 10, 12, 14, 16};
+    bool all_passed = true;
 
+    for (size_t m : ms) {
+        std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+        libiop::field_subset<FieldT> domain{
+            libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
 
+        const auto baseline = cantor::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
+
+#ifdef _OPENMP
+        const std::vector<int> thread_counts = {1, 2, 4, 8};
+        for (int t : thread_counts) {
+            omp_set_num_threads(t);
+            const auto par = cantor::additive_FFT_parallel<FieldT>(poly_coeffs, domain.subspace());
+            const bool ok = check_equal<FieldT>(baseline, par);
+            all_passed = all_passed && ok;
+            std::cout << "m=" << m << "  threads=" << t << "  parallel vs radix-2: "
+                      << (ok ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m") << std::endl;
+        }
+#else
+        const auto par = cantor::additive_FFT_parallel<FieldT>(poly_coeffs, domain.subspace());
+        const bool ok = check_equal<FieldT>(baseline, par);
+        all_passed = all_passed && ok;
+        std::cout << "m=" << m << "  (no OpenMP) parallel alias: "
+                  << (ok ? "PASS" : "FAIL") << std::endl;
+#endif
+    }
+
+    std::cout << (all_passed ? "additive_FFT_parallel ALL PASS" : "SOME FAILED") << std::endl;
+}
+
+// Strategy A over modules: radix-2^K parallel vs radix-2 baseline (K in {2,3,4}).
+void test_radix2k_parallel_correctness()
+{
+    typedef libff::gf256 FieldT;
+    const std::vector<size_t> ms = {4, 5, 6, 8, 10, 11, 12, 13, 14, 16};
+    bool all_passed = true;
+
+    for (size_t m : ms) {
+        std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+        libiop::field_subset<FieldT> domain{
+            libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+
+        const auto baseline = cantor::additive_FFT<FieldT>(poly_coeffs, domain.subspace());
+
+#ifdef _OPENMP
+        const std::vector<int> thread_counts = {1, 2, 4, 8};
+        for (int t : thread_counts) {
+            omp_set_num_threads(t);
+            const auto p2 = cantor::additive_FFT_radix2k_parallel<2, FieldT>(poly_coeffs, domain.subspace());
+            const auto p3 = cantor::additive_FFT_radix2k_parallel<3, FieldT>(poly_coeffs, domain.subspace());
+            const auto p4 = cantor::additive_FFT_radix2k_parallel<4, FieldT>(poly_coeffs, domain.subspace());
+            const bool ok2 = check_equal<FieldT>(baseline, p2);
+            const bool ok3 = check_equal<FieldT>(baseline, p3);
+            const bool ok4 = check_equal<FieldT>(baseline, p4);
+            all_passed = all_passed && ok2 && ok3 && ok4;
+            std::cout << "m=" << m << "  threads=" << t
+                      << "  K=2 par: " << (ok2 ? "PASS" : "FAIL")
+                      << "  K=3 par: " << (ok3 ? "PASS" : "FAIL")
+                      << "  K=4 par: " << (ok4 ? "PASS" : "FAIL") << std::endl;
+        }
+#else
+        const auto p2 = cantor::additive_FFT_radix2k_parallel<2, FieldT>(poly_coeffs, domain.subspace());
+        const auto p3 = cantor::additive_FFT_radix2k_parallel<3, FieldT>(poly_coeffs, domain.subspace());
+        const auto p4 = cantor::additive_FFT_radix2k_parallel<4, FieldT>(poly_coeffs, domain.subspace());
+        const bool ok2 = check_equal<FieldT>(baseline, p2);
+        const bool ok3 = check_equal<FieldT>(baseline, p3);
+        const bool ok4 = check_equal<FieldT>(baseline, p4);
+        all_passed = all_passed && ok2 && ok3 && ok4;
+        std::cout << "m=" << m << "  (no OpenMP) radix2k_parallel K=2,3,4: "
+                  << (ok2 && ok3 && ok4 ? "PASS" : "FAIL") << std::endl;
+#endif
+    }
+
+    std::cout << (all_passed ? "radix2k_parallel ALL PASS" : "SOME FAILED") << std::endl;
+}
+
+/// Strategy A on the Cantor table path: \c additive_FFT_parallel(poly, m, shift_dim) vs serial baseline.
+void test_cantor_precmp_parallel_correctness()
+{
+    typedef libff::gf256 FieldT;
+    const std::vector<unsigned> ms = {4, 5, 6, 8, 10, 12, 14, 16};
+    const size_t                   shift_dim = 31;
+    bool                           all_passed = true;
+
+    for (unsigned m : ms) {
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+        const auto          baseline    = cantor::additive_FFT<FieldT>(poly_coeffs, m, shift_dim);
+
+#ifdef _OPENMP
+        const std::vector<int> thread_counts = {1, 2, 4, 8};
+        for (int t : thread_counts) {
+            omp_set_num_threads(t);
+            const auto par = cantor::additive_FFT_parallel<FieldT>(poly_coeffs, m, shift_dim);
+            const bool ok  = check_equal<FieldT>(baseline, par);
+            all_passed     = all_passed && ok;
+            std::cout << "cantor precmp m=" << m << "  threads=" << t << "  parallel: "
+                      << (ok ? "\033[1;32mPass\033[0m" : "\033[1;31mFail\033[0m") << std::endl;
+        }
+#else
+        const auto par = cantor::additive_FFT_parallel<FieldT>(poly_coeffs, m, shift_dim);
+        const bool ok  = check_equal<FieldT>(baseline, par);
+        all_passed     = all_passed && ok;
+        std::cout << "cantor precmp m=" << m << "  (no OpenMP) parallel alias: "
+                  << (ok ? "PASS" : "FAIL") << std::endl;
+#endif
+    }
+
+    std::cout << (all_passed ? "cantor precmp parallel ALL PASS" : "SOME FAILED") << std::endl;
+}
+
+/// Fused radix-2^K on the Cantor combination table path vs radix-2 baseline.
+void test_cantor_precmp_radix2k_correctness()
+{
+    typedef libff::gf256 FieldT;
+    const std::vector<unsigned> ms = {2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18};
+    const size_t                 shift_dim = 31;
+    bool                         all_passed = true;
+
+    for (unsigned m : ms) {
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+        const auto          baseline    = cantor::additive_FFT<FieldT>(poly_coeffs, m, shift_dim);
+
+        const auto r2k1 = cantor::additive_FFT_radix2k<1, FieldT>(poly_coeffs, m, shift_dim);
+        const auto r2k2 = cantor::additive_FFT_radix2k<2, FieldT>(poly_coeffs, m, shift_dim);
+        const auto r2k3 = cantor::additive_FFT_radix2k<3, FieldT>(poly_coeffs, m, shift_dim);
+        const auto r2k4 = cantor::additive_FFT_radix2k<4, FieldT>(poly_coeffs, m, shift_dim);
+        const auto r4   = cantor::additive_FFT_radix4<FieldT>(poly_coeffs, m, shift_dim);
+
+        const bool ok1  = check_equal<FieldT>(baseline, r2k1);
+        const bool ok2  = check_equal<FieldT>(baseline, r2k2);
+        const bool ok3  = check_equal<FieldT>(baseline, r2k3);
+        const bool ok4  = check_equal<FieldT>(baseline, r2k4);
+        const bool ok4b = check_equal<FieldT>(baseline, r4);
+
+        std::cout << "cantor precmp radix2k m=" << m << "  K=1:" << (ok1 ? "PASS" : "FAIL")
+                  << "  K=2:" << (ok2 ? "PASS" : "FAIL") << "  K=3:" << (ok3 ? "PASS" : "FAIL")
+                  << "  K=4:" << (ok4 ? "PASS" : "FAIL") << "  radix4:" << (ok4b ? "PASS" : "FAIL")
+                  << std::endl;
+        all_passed = all_passed && ok1 && ok2 && ok3 && ok4 && ok4b;
+    }
+
+    std::cout << (all_passed ? "cantor precmp radix2k ALL PASS" : "SOME FAILED") << std::endl;
+}
+
+/// Parallel fused radix-2^K on the Cantor table path vs serial baseline.
+void test_cantor_precmp_radix2k_parallel_correctness()
+{
+    typedef libff::gf256 FieldT;
+    const std::vector<unsigned> ms = {4, 5, 6, 8, 10, 12, 14, 16};
+    const size_t                 shift_dim = 31;
+    bool                         all_passed = true;
+
+    for (unsigned m : ms) {
+        std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
+        const auto          baseline    = cantor::additive_FFT<FieldT>(poly_coeffs, m, shift_dim);
+
+#ifdef _OPENMP
+        const std::vector<int> thread_counts = {1, 2, 4, 8};
+        for (int t : thread_counts) {
+            omp_set_num_threads(t);
+            const auto p2 = cantor::additive_FFT_radix2k_parallel<2, FieldT>(poly_coeffs, m, shift_dim);
+            const auto p3 = cantor::additive_FFT_radix2k_parallel<3, FieldT>(poly_coeffs, m, shift_dim);
+            const auto p4 = cantor::additive_FFT_radix2k_parallel<4, FieldT>(poly_coeffs, m, shift_dim);
+            const bool ok2 = check_equal<FieldT>(baseline, p2);
+            const bool ok3 = check_equal<FieldT>(baseline, p3);
+            const bool ok4 = check_equal<FieldT>(baseline, p4);
+            all_passed     = all_passed && ok2 && ok3 && ok4;
+            std::cout << "cantor precmp radix2k par m=" << m << "  threads=" << t << "  K=2:"
+                      << (ok2 ? "PASS" : "FAIL") << "  K=3:" << (ok3 ? "PASS" : "FAIL") << "  K=4:"
+                      << (ok4 ? "PASS" : "FAIL") << std::endl;
+        }
+#else
+        const auto p2 = cantor::additive_FFT_radix2k_parallel<2, FieldT>(poly_coeffs, m, shift_dim);
+        const bool ok2 = check_equal<FieldT>(baseline, p2);
+        all_passed     = all_passed && ok2;
+        std::cout << "cantor precmp radix2k par m=" << m << "  (no OpenMP) K=2: " << (ok2 ? "PASS" : "FAIL")
+                  << std::endl;
+#endif
+    }
+
+    std::cout << (all_passed ? "cantor precmp radix2k_parallel ALL PASS" : "SOME FAILED") << std::endl;
+}
 
 int main()
 {
@@ -434,6 +669,12 @@ int main()
     // test_LCH();
     test_LCH_radix4_correctness();
     test_LCH_radix2k_correctness();
+    test_LCH_parallel_correctness();
+    test_additive_fft_parallel_correctness();
+    test_radix2k_parallel_correctness();
+    test_cantor_precmp_parallel_correctness();
+    test_cantor_precmp_radix2k_correctness();
+    test_cantor_precmp_radix2k_parallel_correctness();
 
     // test_radix2k_correctness();
 
