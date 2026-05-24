@@ -109,6 +109,13 @@ namespace lch {
     static inline
     unsigned get_s_k_a_cantor( unsigned k , unsigned a ) { return (a>>k); }
 
+    template<typename FieldT>
+    void i_butterfly_op(std::vector<FieldT> &poly, unsigned offset, unsigned unit, unsigned ska,
+                          size_t shift_bit, FieldT *cantor_combinations);
+
+    template<typename FieldT>
+    void inv_butterfly(std::vector<FieldT> &poly_coeffs, const size_t n_terms, const size_t shift_dim,
+                         FieldT *cantor_combinations);
 
     template<typename FieldT>   
     static
@@ -188,107 +195,11 @@ namespace lch {
         return acc;
     }
 
-    // Radix-4 LCH butterfly. Mathematically equivalent to two consecutive
-    // radix-2 stages of `butterfly`, fused into a single ascending sweep over
-    // the four quarters of each module so that each radix-4 round touches the
-    // module exactly once. When log_n is odd we run (log_n-1)/2 radix-4 rounds
-    // followed by a single residual radix-2 stage at i = 1.
-    //
-    // Inside one radix-4 round the four quarters undergo
-    //
-    //     | h_0 |   | 1   T_1   T_2   T_1 T_2       | | f_0 |
-    //     | h_1 | = | 1  T_1+1  T_2  (T_1+1) T_2    | | f_1 |
-    //     | h_2 |   | 1  T_1+b  T_2+1 (T_1+b)(T_2+1)| | f_2 |
-    //     | h_3 |   | 1 T_1+b+1 T_2+1 (T_1+b+1)(T_2+1)| | f_3 |
-    //
-    // with b = beta_1 (so b^2 + b = 1, hence T_3 = T_1 + b is the twiddle on
-    // the upper half during the inner stage). T_2 is the radix-2 twiddle of
-    // the outer stage on this module; T_1 is the radix-2 twiddle of the inner
-    // stage on the lower-half sub-module. The bit-pattern that encodes T_1
-    // is the bit-pattern that encodes T_2 shifted up by one (because
-    // S^{i-2}(beta_k) = beta_{k-i+2} = beta_{(k-i+1)+1}).
-    template<typename FieldT>
-    void butterfly_radix4(std::vector<FieldT> &poly_coeffs,
-                          const size_t n_terms, const size_t shift_dim,
-                          FieldT* cantor_combinations) {
-        if (1 >= n_terms) return;
-
-        const unsigned log_n = __builtin_ctz(n_terms);
-        const unsigned m     = __builtin_ctz(poly_coeffs.size());
-
-        // beta_1 lives at cantor_combinations[2] (bits-of-2 = bit 1 set, so
-        // the encoded element has Cantor coordinate beta_1 only).
-        const FieldT beta_1 = cantor_combinations[2];
-
-        const unsigned num_radix4 = log_n / 2;
-
-        for (unsigned outer = 0; outer < num_radix4; ++outer) {
-            const unsigned i_high  = log_n - 2 * outer;
-            const unsigned unit    = 1u << i_high;
-            const unsigned half    = unit >> 1;
-            const unsigned quarter = unit >> 2;
-            const size_t   num_modules = poly_coeffs.size() / unit;
-
-            const size_t shift_bit_high = (shift_dim == 0) ? 0
-                : (num_modules << (shift_dim - m));
-
-            for (size_t mod = 0; mod < num_modules; ++mod) {
-                const size_t offset = mod * unit;
-
-                const size_t mshift_T2 = (mod << 1) | (shift_bit_high << 1);
-                const size_t mshift_T1 = mshift_T2 << 1;
-
-                const FieldT T_2 = element_from_cantor_bits<FieldT>(mshift_T2, cantor_combinations);
-                const FieldT T_1 = element_from_cantor_bits<FieldT>(mshift_T1, cantor_combinations);
-                const FieldT T_3 = T_1 + beta_1;
-
-                // Single ascending sweep over the four quarters; 4 reads and
-                // 4 writes per inner iteration, all intermediates kept in
-                // registers.
-                for (unsigned jj = 0; jj < quarter; ++jj) {
-                    const FieldT q0 = poly_coeffs[offset + jj];
-                    const FieldT q1 = poly_coeffs[offset + quarter + jj];
-                    const FieldT q2 = poly_coeffs[offset + half + jj];
-                    const FieldT q3 = poly_coeffs[offset + half + quarter + jj];
-
-                    const FieldT u0 = q0 + T_2 * q2;
-                    const FieldT u1 = q1 + T_2 * q3;
-                    const FieldT u2 = u0 + q2;
-                    const FieldT u3 = u1 + q3;
-
-                    const FieldT h0 = u0 + T_1 * u1;
-                    const FieldT h2 = u2 + T_3 * u3;
-                    const FieldT h1 = h0 + u1;
-                    const FieldT h3 = h2 + u3;
-
-                    poly_coeffs[offset + jj]                  = h0;
-                    poly_coeffs[offset + quarter + jj]        = h1;
-                    poly_coeffs[offset + half + jj]           = h2;
-                    poly_coeffs[offset + half + quarter + jj] = h3;
-                }
-            }
-        }
-
-        // Mixed-radix epilogue: when log_n is odd, do the final radix-2 stage
-        // at i = 1 (unit = 2). This is exactly butterfly_op with unit = 2.
-        if (log_n & 1u) {
-            const unsigned unit = 2;
-            const size_t   num_modules = poly_coeffs.size() / unit;
-            const size_t   shift_bit = (shift_dim == 0) ? 0
-                : (num_modules << (shift_dim - m));
-
-            for (size_t mod = 0; mod < num_modules; ++mod) {
-                butterfly_op(poly_coeffs, mod * unit, unit,
-                             get_s_k_a_cantor(0, mod * unit),
-                             shift_bit, cantor_combinations);
-            }
-        }
-    }
-
-    // Templated radix-2^K LCH butterfly. Generalises butterfly_radix4
-    // (which is the K = 2 specialisation). Per outer round, processes a module
-    // of size L = 2^{logL} as Q = 2^K quarters of size L/Q in a single
-    // ascending sweep, executing K consecutive radix-2 stages in registers.
+    // Templated radix-2^K LCH butterfly. K=2 is radix-4; K in {3, 4, 5} fuse
+    // 3, 4, 5 consecutive radix-2 stages into a single in-register K-stage
+    // butterfly per outer round. Per outer round, processes a module of size
+    // L = 2^{logL} as Q = 2^K quarters of size L/Q in a single ascending
+    // sweep, executing K consecutive radix-2 stages in registers.
     //
     // Twiddle structure: for round_j and module index `mod`, level `ell` in
     // the in-register K-stage butterfly uses the radix-2 stage twiddle for
@@ -573,6 +484,264 @@ namespace lch {
                         butterfly_op(poly_coeffs, 0, unit,
                                      get_s_k_a_cantor(i_stage - 1, 0), shift_bit,
                                      cantor_combinations);
+                    }
+                }
+            }
+        }
+#endif
+    }
+
+    template<typename FieldT>
+    void inv_butterfly_parallel(std::vector<FieldT> &poly_coeffs,
+                                const size_t n_terms, const size_t shift_dim,
+                                FieldT *cantor_combinations)
+    {
+#ifndef _OPENMP
+        inv_butterfly(poly_coeffs, n_terms, shift_dim, cantor_combinations);
+#else
+        if (1 >= n_terms)
+            return;
+
+        const unsigned log_n = __builtin_ctz(n_terms);
+        const unsigned m     = __builtin_ctz(poly_coeffs.size());
+
+#pragma omp parallel shared(poly_coeffs, shift_dim, cantor_combinations, log_n, m)
+        {
+            for (unsigned i = 1; i <= log_n; ++i) {
+                const unsigned unit      = (1u << i);
+                const unsigned num       = static_cast<unsigned>(poly_coeffs.size() / unit);
+                const size_t   shift_bit = shift_dim == 0 ? 0 : (static_cast<size_t>(num) << (shift_dim - m));
+
+                if (num >= 2u) {
+#pragma omp for schedule(static)
+                    for (unsigned j = 0; j < num; ++j) {
+                        i_butterfly_op(poly_coeffs, j * unit, unit, get_s_k_a_cantor(i - 1, j * unit),
+                                       shift_bit, cantor_combinations);
+                    }
+                } else {
+#pragma omp single
+                    {
+                        i_butterfly_op(poly_coeffs, 0, unit, get_s_k_a_cantor(i - 1, 0), shift_bit,
+                                       cantor_combinations);
+                    }
+                }
+            }
+        }
+#endif
+    }
+
+    template<size_t K, typename FieldT>
+    void inv_butterfly_radix2k(std::vector<FieldT> &poly_coeffs,
+                               const size_t n_terms, const size_t shift_dim,
+                               FieldT *cantor_combinations)
+    {
+        static_assert(K >= 1, "K must be >= 1");
+        static_assert(K <= 5, "K supported up to 5 (radix up to 32)");
+
+        if (1 >= n_terms)
+            return;
+
+        const unsigned log_n = __builtin_ctz(n_terms);
+        const unsigned m     = __builtin_ctz(poly_coeffs.size());
+
+        constexpr size_t Q      = 1ull << K;
+        constexpr size_t Q_half = Q >> 1;
+
+        std::array<FieldT, (Q_half == 0 ? 1 : Q_half)> block_offsets;
+        block_offsets[0] = FieldT::zero();
+        for (size_t c = 1; c < Q_half; ++c) {
+            const size_t low_bit = __builtin_ctzll(c);
+            block_offsets[c] = block_offsets[c ^ (1ull << low_bit)]
+                             + cantor_combinations[1ull << (low_bit + 1)];
+        }
+
+        const unsigned num_rounds = log_n / K;
+        const unsigned residual   = log_n - K * num_rounds;
+
+        for (unsigned r_res = residual; r_res-- > 0;) {
+            const unsigned i_stage = log_n - K * num_rounds - r_res;
+            const unsigned unit    = 1u << i_stage;
+            const size_t   num     = poly_coeffs.size() >> i_stage;
+            const size_t   shift_bit = (shift_dim == 0) ? 0 : (num << (shift_dim - m));
+
+            for (size_t mod = 0; mod < num; ++mod) {
+                i_butterfly_op(poly_coeffs, mod * unit, unit, get_s_k_a_cantor(i_stage - 1, mod * unit),
+                               shift_bit, cantor_combinations);
+            }
+        }
+
+        for (unsigned round_j = num_rounds; round_j-- > 0;) {
+            const unsigned logL        = log_n - K * round_j;
+            const size_t   L           = 1ull << logL;
+            const size_t   chunk       = L >> K;
+            const size_t   num_modules = poly_coeffs.size() >> logL;
+            const size_t   shift_bit_1 = (shift_dim == 0) ? 0 : (num_modules << (shift_dim - m));
+
+            for (size_t mod = 0; mod < num_modules; ++mod) {
+                const size_t offset   = mod * L;
+                const size_t mshift_1 = (mod << 1) | (shift_bit_1 << 1);
+                std::array<FieldT, K + 1> base_T;
+                for (size_t ell = 1; ell <= K; ++ell) {
+                    base_T[ell] = element_from_cantor_bits<FieldT>(mshift_1 << (ell - 1), cantor_combinations);
+                }
+
+                for (size_t jj = 0; jj < chunk; ++jj) {
+                    FieldT v[Q];
+                    for (size_t i = 0; i < Q; ++i)
+                        v[i] = poly_coeffs[offset + i * chunk + jj];
+
+                    for (size_t ell = K; ell >= 1; --ell) {
+                        const size_t stride     = 1ull << (K - ell);
+                        const size_t num_blocks = 1ull << (ell - 1);
+                        for (size_t b = num_blocks; b-- > 0;) {
+                            const FieldT T_lb = base_T[ell] + block_offsets[b];
+                            for (size_t t = stride; t-- > 0;) {
+                                const size_t i0 = b * (stride << 1) + t;
+                                const size_t i1 = i0 + stride;
+                                v[i1] += v[i0];
+                                v[i0] += T_lb * v[i1];
+                            }
+                        }
+                    }
+
+                    for (size_t i = 0; i < Q; ++i)
+                        poly_coeffs[offset + i * chunk + jj] = v[i];
+                }
+            }
+        }
+    }
+
+    template<size_t K, typename FieldT>
+    void inv_butterfly_radix2k_parallel(std::vector<FieldT> &poly_coeffs,
+                                        const size_t n_terms, const size_t shift_dim,
+                                        FieldT *cantor_combinations)
+    {
+#ifndef _OPENMP
+        inv_butterfly_radix2k<K, FieldT>(poly_coeffs, n_terms, shift_dim, cantor_combinations);
+#else
+        static_assert(K >= 1, "K must be >= 1");
+        static_assert(K <= 5, "K supported up to 5 (radix up to 32)");
+
+        if (1 >= n_terms)
+            return;
+
+        const unsigned log_n = __builtin_ctz(n_terms);
+        const unsigned m     = __builtin_ctz(poly_coeffs.size());
+
+        constexpr size_t Q      = 1ull << K;
+        constexpr size_t Q_half = Q >> 1;
+
+        std::array<FieldT, (Q_half == 0 ? 1 : Q_half)> block_offsets;
+        block_offsets[0] = FieldT::zero();
+        for (size_t c = 1; c < Q_half; ++c) {
+            const size_t low_bit = __builtin_ctzll(c);
+            block_offsets[c] = block_offsets[c ^ (1ull << low_bit)]
+                             + cantor_combinations[1ull << (low_bit + 1)];
+        }
+
+        const unsigned num_rounds = log_n / K;
+        const unsigned residual   = log_n - K * num_rounds;
+
+#pragma omp parallel shared(poly_coeffs, shift_dim, cantor_combinations, log_n, m, block_offsets, num_rounds, \
+                                residual)
+        {
+            for (unsigned r_res = residual; r_res-- > 0;) {
+                const unsigned i_stage = log_n - K * num_rounds - r_res;
+                const unsigned unit    = 1u << i_stage;
+                const size_t   num     = poly_coeffs.size() >> i_stage;
+                const size_t   shift_bit = (shift_dim == 0) ? 0 : (num << (shift_dim - m));
+
+                if (num >= 2) {
+#pragma omp for schedule(static)
+                    for (size_t mod = 0; mod < num; ++mod) {
+                        i_butterfly_op(poly_coeffs, mod * unit, unit,
+                                       get_s_k_a_cantor(i_stage - 1, mod * unit), shift_bit,
+                                       cantor_combinations);
+                    }
+                } else {
+#pragma omp single
+                    {
+                        i_butterfly_op(poly_coeffs, 0, unit, get_s_k_a_cantor(i_stage - 1, 0), shift_bit,
+                                       cantor_combinations);
+                    }
+                }
+            }
+
+            for (unsigned round_j = num_rounds; round_j-- > 0;) {
+                const unsigned logL        = log_n - K * round_j;
+                const size_t   L           = 1ull << logL;
+                const size_t   chunk       = L >> K;
+                const size_t   num_modules = poly_coeffs.size() >> logL;
+                const size_t   shift_bit_1 = (shift_dim == 0) ? 0 : (num_modules << (shift_dim - m));
+
+                if (num_modules >= 2) {
+#pragma omp for schedule(static)
+                    for (size_t mod = 0; mod < num_modules; ++mod) {
+                        const size_t offset   = mod * L;
+                        const size_t mshift_1 = (mod << 1) | (shift_bit_1 << 1);
+                        std::array<FieldT, K + 1> base_T;
+                        for (size_t ell = 1; ell <= K; ++ell) {
+                            base_T[ell] = element_from_cantor_bits<FieldT>(mshift_1 << (ell - 1),
+                                                                           cantor_combinations);
+                        }
+
+                        for (size_t jj = 0; jj < chunk; ++jj) {
+                            FieldT v[Q];
+                            for (size_t i = 0; i < Q; ++i)
+                                v[i] = poly_coeffs[offset + i * chunk + jj];
+
+                            for (size_t ell = K; ell >= 1; --ell) {
+                                const size_t stride     = 1ull << (K - ell);
+                                const size_t num_blocks = 1ull << (ell - 1);
+                                for (size_t b = num_blocks; b-- > 0;) {
+                                    const FieldT T_lb = base_T[ell] + block_offsets[b];
+                                    for (size_t t = stride; t-- > 0;) {
+                                        const size_t i0 = b * (stride << 1) + t;
+                                        const size_t i1 = i0 + stride;
+                                        v[i1] += v[i0];
+                                        v[i0] += T_lb * v[i1];
+                                    }
+                                }
+                            }
+
+                            for (size_t i = 0; i < Q; ++i)
+                                poly_coeffs[offset + i * chunk + jj] = v[i];
+                        }
+                    }
+                } else {
+#pragma omp single
+                    {
+                        const size_t offset   = 0;
+                        const size_t mod      = 0;
+                        const size_t mshift_1 = (mod << 1) | (shift_bit_1 << 1);
+                        std::array<FieldT, K + 1> base_T;
+                        for (size_t ell = 1; ell <= K; ++ell) {
+                            base_T[ell] = element_from_cantor_bits<FieldT>(mshift_1 << (ell - 1),
+                                                                           cantor_combinations);
+                        }
+
+                        for (size_t jj = 0; jj < chunk; ++jj) {
+                            FieldT v[Q];
+                            for (size_t i = 0; i < Q; ++i)
+                                v[i] = poly_coeffs[offset + i * chunk + jj];
+
+                            for (size_t ell = K; ell >= 1; --ell) {
+                                const size_t stride     = 1ull << (K - ell);
+                                const size_t num_blocks = 1ull << (ell - 1);
+                                for (size_t b = num_blocks; b-- > 0;) {
+                                    const FieldT T_lb = base_T[ell] + block_offsets[b];
+                                    for (size_t t = stride; t-- > 0;) {
+                                        const size_t i0 = b * (stride << 1) + t;
+                                        const size_t i1 = i0 + stride;
+                                        v[i1] += v[i0];
+                                        v[i0] += T_lb * v[i1];
+                                    }
+                                }
+                            }
+
+                            for (size_t i = 0; i < Q; ++i)
+                                poly_coeffs[offset + i * chunk + jj] = v[i];
+                        }
                     }
                 }
             }

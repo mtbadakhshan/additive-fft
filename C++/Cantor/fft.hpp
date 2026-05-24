@@ -49,29 +49,24 @@ template<typename FieldT>
 std::vector<FieldT> additive_FFT(const std::vector<FieldT> &poly_coeffs,
                                         const libiop::affine_subspace<FieldT> &domain);
 
-/// OpenMP Strategy A over modules for \ref additive_FFT(poly, domain_dim, shift_dim).
+/// OpenMP parallel over modules for \ref additive_FFT(poly, domain_dim, shift_dim).
 template<typename FieldT>
 std::vector<FieldT> additive_FFT_parallel(const std::vector<FieldT> &poly_coeffs,
                                           const size_t domain_dim,
                                           const size_t shift_dim);
 
-/// OpenMP Strategy A over modules (radix-2 Cantor FFT). Requires OpenMP at
+/// OpenMP parallel \ref additive_IFFT(evals, domain_dim, shift_dim). Without \c _OPENMP,
+/// forwards to the serial implementation.
+template<typename FieldT>
+std::vector<FieldT> additive_IFFT_parallel(const std::vector<FieldT> &evals,
+                                           const size_t domain_dim,
+                                           const size_t shift_dim);
+
+/// OpenMP parallel over modules (radix-2 Cantor FFT). Requires OpenMP at
 /// link time for speedup; without \c _OPENMP, forwards to \ref additive_FFT.
 template<typename FieldT>
 std::vector<FieldT> additive_FFT_parallel(const std::vector<FieldT> &poly_coeffs,
                                           const libiop::affine_subspace<FieldT> &domain);
-
-/// Radix fused paths on \c (domain_dim, shift_dim): same Cantor-combination chart as
-/// \ref additive_FFT(poly, domain_dim, shift_dim). For the affine-subspace chart, use the
-/// \c libiop::affine_subspace overloads.
-template<typename FieldT>
-std::vector<FieldT> additive_FFT_radix4(const std::vector<FieldT> &poly_coeffs,
-                                        const size_t domain_dim,
-                                        const size_t shift_dim);
-
-template<typename FieldT>
-std::vector<FieldT> additive_FFT_radix4(const std::vector<FieldT> &poly_coeffs,
-                                        const libiop::affine_subspace<FieldT> &domain);
 
 template<size_t K, typename FieldT>
 std::vector<FieldT> additive_FFT_radix2k(const std::vector<FieldT> &poly_coeffs,
@@ -82,7 +77,7 @@ template<size_t K, typename FieldT>
 std::vector<FieldT> additive_FFT_radix2k(const std::vector<FieldT> &poly_coeffs,
                                          const libiop::affine_subspace<FieldT> &domain);
 
-/// OpenMP Strategy A for \ref additive_FFT_radix2k(poly, domain_dim, shift_dim) on the
+/// OpenMP parallel \ref additive_FFT_radix2k(poly, domain_dim, shift_dim) on the
 /// combination table path. Without \c _OPENMP, forwards to the serial implementation.
 template<size_t K, typename FieldT>
 std::vector<FieldT> additive_FFT_radix2k_parallel(const std::vector<FieldT> &poly_coeffs,
@@ -93,6 +88,30 @@ template<size_t K, typename FieldT>
 std::vector<FieldT> additive_FFT_radix2k_parallel(const std::vector<FieldT> &poly_coeffs,
                                                   const libiop::affine_subspace<FieldT> &domain);
 
+/// Fused radix-2^K inverse on the Cantor-combination table path.
+template<size_t K, typename FieldT>
+std::vector<FieldT> additive_IFFT_radix2k(const std::vector<FieldT> &evals,
+                                        const size_t domain_dim,
+                                        const size_t shift_dim);
+
+template<size_t K, typename FieldT>
+std::vector<FieldT> additive_IFFT_radix2k(const std::vector<FieldT> &evals,
+                                        const libiop::affine_subspace<FieldT> &domain);
+
+/// OpenMP parallel \ref additive_IFFT_radix2k. Without \c _OPENMP, forwards to serial.
+template<size_t K, typename FieldT>
+std::vector<FieldT> additive_IFFT_radix2k_parallel(const std::vector<FieldT> &evals,
+                                                    const size_t domain_dim,
+                                                    const size_t shift_dim);
+
+template<size_t K, typename FieldT>
+std::vector<FieldT> additive_IFFT_radix2k_parallel(const std::vector<FieldT> &evals,
+                                                    const libiop::affine_subspace<FieldT> &domain);
+
+template<typename FieldT>
+std::vector<FieldT> additive_IFFT_parallel(const std::vector<FieldT> &evals,
+                                           const libiop::affine_subspace<FieldT> &domain);
+
 template<typename FieldT>
 std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &evals,
                                         const libiop::affine_subspace<FieldT> &domain);
@@ -101,5 +120,7 @@ std::vector<FieldT> additive_IFFT(const std::vector<FieldT> &evals,
 
 #include "Cantor/fft.tcc"
 #include "Cantor/fft_hc.tcc"
+#include "Cantor/fft-kernels.tcc"
 #include "Cantor/fft-radix.tcc"
+#include "Cantor/fft-parallel.tcc"
 #endif // ADDITIVE_FFT_CANTOR_HPP_

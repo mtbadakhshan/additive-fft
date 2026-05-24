@@ -5,6 +5,13 @@ Additive Fast Fourier Transforms over Finite Fields
 
 This repository contains both SageMath and C++ implementations related to Cantor and Gao-Mateer algorithms. The C++ implementation relies on the `libff` library, which is included as a Git submodule, so there's no need for a separate installation of `libff`. For the SageMath implementation, only Sage is required.
 
+### C++ benchmarks and performance tools
+
+To build and run timed FFT comparisons (Google Benchmark) and optional Linux
+hardware-counter measurements (`perf stat`), see **[`scripts/README.md`](scripts/README.md)**.
+It lists Linux packages to install, one-time CMake build steps, and how to use
+`bench.sh` and `perf_stat.sh`.
+
 
 
 <!-- 

@@ -1,0 +1,178 @@
+# =============================================================================
+# Measurement config — copy to scripts/measure.conf (gitignored) and edit.
+#
+#   cp scripts/measure.conf.example scripts/measure.conf
+#   ./scripts/run_all.sh
+#
+# Or use an alternate file without copying:
+#   ./scripts/run_all.sh --config scripts/measure.conf.example
+#
+# Precedence (lowest → highest):
+#   1. Script defaults (scripts/load_config.sh)
+#   2. This config file
+#   3. Environment variables already exported in your shell
+#
+# Guide: scripts/README.md
+# Ultra-fast smoke: ./scripts/run_all.sh --config scripts/measure.conf.smoke
+# =============================================================================
+
+
+# =============================================================================
+# COMPREHENSIVE FULL-RUN PROFILE (active below — ready to use as-is)
+#
+# Copy and run; nothing to uncomment for the full profile:
+#   cp scripts/measure.conf.example scripts/measure.conf
+#   ./scripts/run_all.sh
+#
+# Or point run_all at this file directly:
+#   ./scripts/run_all.sh --config scripts/measure.conf.example
+#
+# Expect many hours on a typical machine. Optional extras (OUT, TASKSET_CPUS,
+# extra PERF_EVENTS, 20× warmup rounds) are commented below — uncomment only
+# if you want those.
+# =============================================================================
+
+QUICK=0
+
+# --- Build & output ---
+# Path to CMake build dir (must contain run_benchmark and perf_driver).
+BUILD=C++/build
+# Optional: fixed output root instead of measure_results/run_<timestamp>/
+# OUT=/path/to/my_run
+
+# --- Problem size (applies to BOTH bench and perf) ---
+# Exponent m: transform size is 2^m. Sweep is m = MIN .. MAX inclusive, step STEP.
+MIN_RANGE=14
+MAX_RANGE=22
+STEP=2
+# With defaults above: m ∈ {14, 16, 18, 20, 22}
+
+# NOTE: run_all.sh, bench.sh, and perf_stat.sh call measure_sync_tool_ranges(),
+# which copies MIN_RANGE/MAX_RANGE/STEP into BM_* and PERF_*. Setting BM_MIN_RANGE
+# or PERF_MAX_RANGE separately has no effect unless you change the scripts.
+
+# --- OpenMP thread sweep ---
+# Space-separated list; each value becomes OMP_NUM_THREADS for one pass.
+THREAD_LIST="1 2 4 8"
+OMP_PLACES=cores
+OMP_PROC_BIND=close
+# Optional CPU pinning for perf (Linux taskset -c). Leave empty to disable.
+# TASKSET_CPUS=0-7
+
+# --- run_all.sh: which tools to run ---
+SKIP_BENCH=0
+SKIP_PERF=0
+
+# =============================================================================
+# Google Benchmark (bench.sh) — wall-clock / CPU time
+# =============================================================================
+#
+# Default filter covers the full Cantor + LCH suite:
+#   • Cantor affine-chart: FFT + IFFT, radix-2/4/8/16, serial + parallel
+#   • Cantor table (precmp-basis): same
+#   • LCH table (precmp-basis): FFT + IFFT, radix-2/4/8/16/32, serial + parallel
+#   → 52 benchmark families × |m sweep| × |THREAD_LIST| JSON rows
+#
+# IFFT benchmarks use random eval vectors (same idea as random coeffs for FFT).
+#
+# BENCH_REPETITIONS — statistical repetitions Google Benchmark reports (median).
+# BENCH_MIN_WARMUP_TIME — GB's internal time-based warmup per benchmark (seconds).
+# BENCH_WARMUP_ROUNDS — full dry passes through the filter before each thread count.
+#
+BENCH_REPETITIONS=100
+BENCH_MIN_WARMUP_TIME=1.0
+BENCH_WARMUP_ROUNDS=20
+BENCH_FILTER='(BM_cantor_additive_fft|BM_cantor_additive_ifft)(/|_parallel|_precmp_basis|_radix2k)|BM_lch_additive_(fft|ifft).*precmp_basis'
+
+# Narrow examples (replace BENCH_FILTER):
+# Cantor table FFT+IFFT only at one m:
+# BENCH_FILTER='BM_cantor_additive_fft_precmp_basis/14|BM_cantor_additive_ifft_precmp_basis/14'
+# Cantor affine radix-4 parallel only:
+# BENCH_FILTER='BM_cantor_additive_fft_radix2k_parallel<2>'
+
+# =============================================================================
+# perf stat (perf_stat.sh) — hardware counters
+# =============================================================================
+#
+# PERF_SUITE selects which perf_driver variants to sweep:
+#   cantor — 8 variants: cantor_r2, cantor_r2k2..k4, serial + _par  (FFT only)
+#   lch    — 12 variants: r2, r2k2..k5, serial + _par               (FFT only)
+#   all    — both Cantor and LCH (20 variants)
+#
+# Radix mapping: r2 / cantor_r2 = radix-2, r2k2 / cantor_r2k2 = radix-4, …
+#
+# perf_driver measures FFT kernels only (no IFFT variants yet). Use bench for
+# FFT vs IFFT wall-clock comparison.
+#
+# PERF_ITERS — kernel calls inside each perf stat measurement (inner loop).
+# PERF_REPETITIONS — outer perf stat -r repeats (restarts perf_driver each time).
+# PERF_WARMUP_ROUNDS — dry perf_driver runs before each measurement (outside perf stat).
+# PERF_WARMUP_ITERS — kernel calls per warmup dry run.
+#
+# Total perf measurements ≈ |variants| × |m sweep| × |THREAD_LIST|
+# With PERF_SUITE=all and defaults: 20 × 5 × 4 = 400 measurements.
+#
+PERF_SUITE=all
+PERF_ITERS=100
+PERF_REPETITIONS=3
+PERF_WARMUP_ROUNDS=1
+PERF_WARMUP_ITERS=20
+PERF_EVENTS=cycles,instructions,cache-references,cache-misses
+
+# Extra LLC counters (optional; may need root or adjusted perf_event_paranoid):
+# PERF_EVENTS=cycles,instructions,cache-references,cache-misses,LLC-loads,LLC-load-misses
+
+# For 20 separate warmup passes (instead of one pass of 20 iters):
+# PERF_WARMUP_ROUNDS=20
+# PERF_WARMUP_ITERS=20
+
+# =============================================================================
+# QUICK=1 profile (optional — comment out the active block above, uncomment below)
+# =============================================================================
+# Faster iteration while developing scripts or on a laptop. Overrides several
+# defaults even if you set BENCH_REPETITIONS / PERF_ITERS above.
+#
+# QUICK=1
+# MIN_RANGE=14
+# MAX_RANGE=18
+# STEP=2
+# THREAD_LIST="1 8"
+# BENCH_REPETITIONS=7
+# BENCH_MIN_WARMUP_TIME=0
+# BENCH_WARMUP_ROUNDS=0
+# PERF_ITERS=10
+# PERF_REPETITIONS=1
+# PERF_WARMUP_ROUNDS=0
+# PERF_WARMUP_ITERS=2
+# PERF_SUITE=cantor
+# SKIP_PERF=1
+
+# =============================================================================
+# Bench-only or perf-only
+# =============================================================================
+# SKIP_PERF=1    # wall-clock benchmarks only
+# SKIP_BENCH=1   # hardware counters only (needs perf in PATH)
+
+# =============================================================================
+# Expected artifacts (./scripts/run_all.sh)
+# =============================================================================
+#
+# measure_results/run_<timestamp>/
+# ├── RUN_META.txt          run context, CPU model, bench_status, perf_status
+# ├── console.log           combined stdout/stderr
+# ├── SUMMARY.md            index linking bench/ and perf/ reports
+# ├── bench/
+# │   ├── threads_1.json … threads_8.json
+# │   └── SUMMARY.md        wall/CPU tables, radix-N catalog (FFT/IFFT, serial/par)
+# └── perf/
+#     ├── <variant>_m<m>_t<p>.perf.txt
+#     └── SUMMARY.md        cycles, IPC, cache miss rate
+#
+# Re-summarize without re-running:
+#   python3 scripts/summarize_benchmarks.py measure_results/run_…/bench > …/SUMMARY.md
+#   python3 scripts/summarize_perf.py measure_results/run_…/perf > …/SUMMARY.md
+#   python3 scripts/summarize_run.py measure_results/run_… > …/SUMMARY.md
+#
+# Build prerequisites:
+#   cmake --build C++/build --target run_benchmark perf_driver
+# =============================================================================

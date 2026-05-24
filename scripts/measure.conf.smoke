@@ -1,0 +1,9 @@
+# Minimal smoke test — finishes in ~1–2 minutes. Not for real timings.
+QUICK=1
+MIN_RANGE=14
+MAX_RANGE=14
+STEP=2
+THREAD_LIST=1
+BENCH_FILTER='BM_cantor_additive_fft_precmp_basis/14|BM_cantor_additive_ifft_precmp_basis/14'
+PERF_ITERS=3
+PERF_SUITE=cantor

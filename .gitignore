@@ -5,3 +5,10 @@ C++/build/
 *.o
 *.out
 C/bitpolymul/
+
+benchmark_results/
+perf_results/
+measure_results/
+scripts/measure.conf
+bench_report_*/
+scripts/__pycache__/

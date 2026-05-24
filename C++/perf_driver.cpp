@@ -4,12 +4,13 @@
 //   ./perf_driver <variant> <m> <iters>
 //
 // LCH variants:
-//   r2, r4, r2k1, r2k2, r2k3, r2k4, r2k5
-//   r2_par, r4_par, r2k1_par..r2k5_par  — OpenMP Strategy A (module parallelism)
+//   r2, r2k1, r2k2, r2k3, r2k4, r2k5
+//   r2_par, r2k1_par..r2k5_par  — OpenMP parallel (module parallelism)
+//   (r4 / r4_par removed; use r2k2 / r2k2_par for radix-4)
 //
 // Cantor (affine subspace) variants:
 //   cantor_r2          — cantor::additive_FFT (radix-2)
-//   cantor_r2_par      — cantor::additive_FFT_parallel (OpenMP Strategy A)
+//   cantor_r2_par      — cantor::additive_FFT_parallel (OpenMP)
 //   cantor_r2kK        — cantor::additive_FFT_radix2k<K> for K in {2,3,4}
 //   cantor_r2kK_par    — cantor::additive_FFT_radix2k_parallel<K>
 //
@@ -54,8 +55,6 @@ static void run_lch(const std::string &which, size_t m, size_t iters,
     for (size_t k = 0; k < iters; ++k) {
         if (which == "r2")
             out = lch::additive_FFT<FieldT>(input, m, m);
-        else if (which == "r4")
-            out = lch::additive_FFT_radix4<FieldT>(input, m, m);
         else if (which == "r2k1")
             out = lch::additive_FFT_radix2k<1, FieldT>(input, m, m);
         else if (which == "r2k2")
@@ -68,8 +67,6 @@ static void run_lch(const std::string &which, size_t m, size_t iters,
             out = lch::additive_FFT_radix2k<5, FieldT>(input, m, m);
         else if (which == "r2_par")
             out = lch::additive_FFT_parallel<FieldT>(input, m, m);
-        else if (which == "r4_par")
-            out = lch::additive_FFT_radix4_parallel<FieldT>(input, m, m);
         else if (which == "r2k1_par")
             out = lch::additive_FFT_radix2k_parallel<1, FieldT>(input, m, m);
         else if (which == "r2k2_par")
@@ -135,7 +132,7 @@ int main(int argc, char **argv)
     if (argc != 4) {
         std::fprintf(stderr,
                      "usage: %s <variant> <m> <iters>\n"
-                     "  LCH: r2, r4, r2k1..r2k5, r2_par, r4_par, r2k1_par..r2k5_par\n"
+                     "  LCH: r2, r2k1..r2k5, r2_par, r2k1_par..r2k5_par\n"
                      "  Cantor: cantor_r2, cantor_r2_par, cantor_r2k2|3|4, cantor_r2k2_par|3_par|4_par\n",
                      argv[0]);
         return 1;

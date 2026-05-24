@@ -1,3 +1,13 @@
+// Google Benchmark suite for additive FFT variants (Cantor, LCH, IFFT, radix-2^k).
+//
+// Build:  cmake --build C++/build --target run_benchmark
+// Run:    ./scripts/bench.sh          (see scripts/README.md for deps and env vars)
+// Manual: export BM_MIN_RANGE=14 BM_MAX_RANGE=22 BM_STEP=2
+//         C++/build/run_benchmark --benchmark_filter='BM_cantor_additive_fft'
+//
+// Requires BM_MIN_RANGE, BM_MAX_RANGE, BM_STEP at process start (set by bench.sh).
+// For cache/IPC counters use perf_driver + scripts/perf_stat.sh (not this binary).
+
 #include <benchmark/benchmark.h>
 #include <cstdlib>
 #include <sstream>
@@ -172,26 +182,6 @@ static void BM_cantor_additive_fft_parallel(benchmark::State &state)
     state.SetItemsProcessed(state.iterations());
 }
 
-// Same domain setup as BM_cantor_additive_fft for apples-to-apples comparison with radix-4.
-static void BM_cantor_additive_fft_radix4(benchmark::State &state)
-{
-    typedef libff::gf256 FieldT;
-    const size_t m = state.range(0);
-    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
-
-    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
-    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
-    std::vector<FieldT> result;
-    for (auto _ : state)
-    {
-        benchmark::DoNotOptimize(poly_coeffs);
-        benchmark::DoNotOptimize(domain);
-        benchmark::DoNotOptimize(result = cantor::additive_FFT_radix4<FieldT>(poly_coeffs, domain.subspace()));
-        benchmark::ClobberMemory();
-    }
-    state.SetItemsProcessed(state.iterations());
-}
-
 // Templated radix-2^K benchmark; instantiated for K = 2, 3, 4.
 template<size_t K>
 static void BM_cantor_additive_fft_radix2k(benchmark::State &state)
@@ -234,6 +224,88 @@ static void BM_cantor_additive_fft_radix2k_parallel(benchmark::State &state)
     state.SetItemsProcessed(state.iterations());
 }
 
+// IFFT benchmarks (affine chart: random evals as input; same pattern as FFT using random coeffs).
+static void BM_cantor_additive_ifft(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(domain);
+        benchmark::DoNotOptimize(result = cantor::additive_IFFT<FieldT>(evals, domain.subspace()));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+static void BM_cantor_additive_ifft_parallel(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(domain);
+        benchmark::DoNotOptimize(
+            result = cantor::additive_IFFT_parallel<FieldT>(evals, domain.subspace()));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+template<size_t K>
+static void BM_cantor_additive_ifft_radix2k(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(domain);
+        benchmark::DoNotOptimize(
+            result = cantor::additive_IFFT_radix2k<K, FieldT>(evals, domain.subspace()));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+template<size_t K>
+static void BM_cantor_additive_ifft_radix2k_parallel(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    std::vector<FieldT> basis(cantor_basis<FieldT>(m));
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    libiop::field_subset<FieldT> domain{libiop::affine_subspace<FieldT>(basis, FieldT::random_element())};
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(domain);
+        benchmark::DoNotOptimize(
+            result = cantor::additive_IFFT_radix2k_parallel<K, FieldT>(evals, domain.subspace()));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
 // Benchmark for cantor::additive_FFT (precmp-basis)-----------------------------------------------------------------------------------------------------------------------
 static void BM_cantor_additive_fft_precmp_basis(benchmark::State &state)
 {
@@ -251,7 +323,7 @@ static void BM_cantor_additive_fft_precmp_basis(benchmark::State &state)
     state.SetItemsProcessed(state.iterations());
 }
 
-// Cantor table path (domain_dim, shift_dim) — OpenMP parallel (Strategy A on s_i / cantor_combinations).
+// Cantor table path (domain_dim, shift_dim) — OpenMP parallel (s_i / cantor_combinations).
 static void BM_cantor_additive_fft_precmp_basis_parallel(benchmark::State &state)
 {
     typedef libff::gf256 FieldT;
@@ -265,23 +337,6 @@ static void BM_cantor_additive_fft_precmp_basis_parallel(benchmark::State &state
         benchmark::DoNotOptimize(poly_coeffs);
         benchmark::DoNotOptimize(
             result = cantor::additive_FFT_parallel<FieldT>(poly_coeffs, m, shift_dim));
-        benchmark::ClobberMemory();
-    }
-    state.SetItemsProcessed(state.iterations());
-}
-
-// Radix on (m, shift_dim): fused combination-table path (same chart as additive_FFT(poly, m, shift_dim)).
-static void BM_cantor_additive_fft_precmp_basis_radix4(benchmark::State &state)
-{
-    typedef libff::gf256 FieldT;
-    const size_t m = state.range(0);
-
-    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
-    std::vector<FieldT> result;
-    for (auto _ : state)
-    {
-        benchmark::DoNotOptimize(poly_coeffs);
-        benchmark::DoNotOptimize(result = cantor::additive_FFT_radix4<FieldT>(poly_coeffs, m, 31));
         benchmark::ClobberMemory();
     }
     state.SetItemsProcessed(state.iterations());
@@ -361,23 +416,6 @@ static void BM_lch_additive_fft_precmp_basis(benchmark::State &state)
     state.SetItemsProcessed(state.iterations());
 }
 
-// Benchmark for lch::additive_FFT_radix4 (precmp-basis)-----------------------------------------------------------------------------------------------------------------------
-static void BM_lch_additive_fft_radix4_precmp_basis(benchmark::State &state)
-{
-    typedef libff::gf256 FieldT;
-    const size_t m = state.range(0);
-
-    std::vector<FieldT> poly_coeffs = libiop::random_vector<FieldT>(1ull << m);
-    std::vector<FieldT> result;
-    for (auto _ : state)
-    {
-        benchmark::DoNotOptimize(poly_coeffs);
-        benchmark::DoNotOptimize(result = lch::additive_FFT_radix4<FieldT>(poly_coeffs, m, 31));
-        benchmark::ClobberMemory();
-    }
-    state.SetItemsProcessed(state.iterations());
-}
-
 // Benchmark for lch::additive_FFT_radix2k<K> (precmp-basis) ---------------
 template<size_t K>
 static void BM_lch_additive_fft_radix2k_precmp_basis(benchmark::State &state)
@@ -430,49 +468,225 @@ static void BM_lch_additive_fft_radix2k_parallel_precmp_basis(benchmark::State &
     state.SetItemsProcessed(state.iterations());
 }
 
+// IFFT benchmarks (precmp-basis: random evals as input).
+static void BM_cantor_additive_ifft_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    constexpr size_t shift_dim = 31;
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(result = cantor::additive_IFFT<FieldT>(evals, m, shift_dim));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+static void BM_cantor_additive_ifft_precmp_basis_parallel(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    constexpr size_t shift_dim = 31;
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(result = cantor::additive_IFFT_parallel<FieldT>(evals, m, shift_dim));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+template<size_t K>
+static void BM_cantor_additive_ifft_precmp_basis_radix2k(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    constexpr size_t shift_dim = 31;
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(
+            result = cantor::additive_IFFT_radix2k<K, FieldT>(evals, m, shift_dim));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+template<size_t K>
+static void BM_cantor_additive_ifft_precmp_basis_radix2k_parallel(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    constexpr size_t shift_dim = 31;
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(
+            result = cantor::additive_IFFT_radix2k_parallel<K, FieldT>(evals, m, shift_dim));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+static void BM_lch_additive_ifft_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    constexpr size_t shift_dim = 31;
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(result = lch::additive_IFFT<FieldT>(evals, m, shift_dim));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+static void BM_lch_additive_ifft_parallel_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    constexpr size_t shift_dim = 31;
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(result = lch::additive_IFFT_parallel<FieldT>(evals, m, shift_dim));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+template<size_t K>
+static void BM_lch_additive_ifft_radix2k_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    constexpr size_t shift_dim = 31;
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(result = lch::additive_IFFT_radix2k<K, FieldT>(evals, m, shift_dim));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
+template<size_t K>
+static void BM_lch_additive_ifft_radix2k_parallel_precmp_basis(benchmark::State &state)
+{
+    typedef libff::gf256 FieldT;
+    const size_t m = state.range(0);
+    constexpr size_t shift_dim = 31;
+
+    const std::vector<FieldT> evals = libiop::random_vector<FieldT>(1ull << m);
+    std::vector<FieldT> result;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(evals);
+        benchmark::DoNotOptimize(
+            result = lch::additive_IFFT_radix2k_parallel<K, FieldT>(evals, m, shift_dim));
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(state.iterations());
+}
+
 
 const int MIN_RANGE = std::stoi(std::getenv("BM_MIN_RANGE"));
 const int MAX_RANGE = std::stoi(std::getenv("BM_MAX_RANGE"));
 const int STEP = std::stoi(std::getenv("BM_STEP"));
 
-BENCHMARK(BM_libiop_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-// BENCHMARK(BM_gao_additive_fft_lvl1)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_gao_additive_fft_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-// BENCHMARK(BM_gao_additive_fft_co)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_gao_additive_fft_co_lvl2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft_parallel)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft_radix4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k, 2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k, 3)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k, 4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k_parallel, 2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k_parallel, 3)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_radix2k_parallel, 4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft_precmp_basis_parallel)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft_precmp_basis_radix4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_precmp_basis_radix2k, 2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_precmp_basis_radix2k, 3)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_precmp_basis_radix2k, 4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 3)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_cantor_additive_fft_precmp)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-// BENCHMARK(BM_libiop_naive_fft)->DenseRange(MIN_RANGE, 10, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_lch_additive_fft_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_lch_additive_fft_radix4_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 1)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 3)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_precmp_basis, 5)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK(BM_lch_additive_fft_parallel_precmp_basis)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 1)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 2)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 3)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 4)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 5)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+#define REGISTER_BENCH(fn) \
+    BENCHMARK(fn)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true)
+#define REGISTER_BENCH_K(fn, k) \
+    BENCHMARK_TEMPLATE(fn, k)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true)
+
+// Default suite for scripts/bench.sh (Cantor affine + table path + LCH).
+REGISTER_BENCH(BM_cantor_additive_fft);
+REGISTER_BENCH(BM_cantor_additive_fft_parallel);
+REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k, 2);
+REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k, 3);
+REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k, 4);
+REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k_parallel, 2);
+REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k_parallel, 3);
+REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k_parallel, 4);
+
+REGISTER_BENCH(BM_cantor_additive_ifft);
+REGISTER_BENCH(BM_cantor_additive_ifft_parallel);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k, 2);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k, 3);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k, 4);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k_parallel, 2);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k_parallel, 3);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k_parallel, 4);
+
+REGISTER_BENCH(BM_cantor_additive_fft_precmp_basis);
+REGISTER_BENCH(BM_cantor_additive_fft_precmp_basis_parallel);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 2);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 3);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 4);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 2);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 3);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 4);
+
+REGISTER_BENCH(BM_lch_additive_fft_precmp_basis);
+REGISTER_BENCH(BM_lch_additive_fft_parallel_precmp_basis);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 2);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 3);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 4);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 5);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 2);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 3);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 4);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 5);
+
+REGISTER_BENCH(BM_cantor_additive_ifft_precmp_basis);
+REGISTER_BENCH(BM_cantor_additive_ifft_precmp_basis_parallel);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 2);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 3);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 4);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k_parallel, 2);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k_parallel, 3);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k_parallel, 4);
+
+REGISTER_BENCH(BM_lch_additive_ifft_precmp_basis);
+REGISTER_BENCH(BM_lch_additive_ifft_parallel_precmp_basis);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 2);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 3);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 4);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 5);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_parallel_precmp_basis, 2);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_parallel_precmp_basis, 3);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_parallel_precmp_basis, 4);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_parallel_precmp_basis, 5);
+
+#undef REGISTER_BENCH
+#undef REGISTER_BENCH_K
+
+// Other families (libiop, Gao, PreComputedValues Cantor path) — enable manually when needed.
+// BENCHMARK(BM_libiop_additive_fft)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
+// BENCHMARK(BM_cantor_additive_fft_precmp)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true);
 
 
 int main(int argc, char **argv)
