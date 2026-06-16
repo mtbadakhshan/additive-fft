@@ -1,0 +1,53 @@
+# =============================================================================
+# Paper profile — only the benchmarks used in the paper's runtime tables.
+#
+#   ./scripts/run_all.sh --config scripts/measure.conf.paper
+#
+# Covers the two forward-FFT table-path families (Cantor table, LCH table),
+# parallel routines swept over THREAD_LIST. The P=1 pass of each parallel
+# routine is the serial baseline reported in the tables.
+#
+# Wall-clock only (perf skipped): the paper tables are Google Benchmark times.
+# =============================================================================
+
+QUICK=0
+BUILD=C++/build
+
+# --- Problem size ---
+# 2^m elements; with gf256 (GF(2^256), 32 B/elt) the array is 32 * 2^m bytes:
+#   m=25 -> 1 GiB,  m=27 -> 4 GiB,  m=29 -> 16 GiB  *per vector*.
+# The transform holds input + working/result buffers, so budget >= ~48-64 GiB
+# RAM for m=29. Lower MAX_RANGE if the machine cannot hold it.
+MIN_RANGE=20
+MAX_RANGE=29
+STEP=1
+
+# --- Thread sweep (gives the P=1,2,4,8 columns) ---
+THREAD_LIST="1 2 4 8"
+OMP_PLACES=cores
+OMP_PROC_BIND=close
+
+# --- Run wall-clock benchmarks only ---
+SKIP_BENCH=0
+SKIP_PERF=1
+
+# --- Focused filter: the forward-FFT table families behind the paper tables ---
+#   Cantor TABLE FFT : radix-2 + radix-2^K (K=2,3,4), OpenMP-free serial + parallel
+#   LCH    TABLE FFT : radix-2 + radix-2^K (K=2,3,4,5), OpenMP-free serial + parallel
+# The '.*precmp_basis' patterns catch both the serial (e.g. *_precmp_basis,
+# *_radix2k_precmp_basis) and parallel (*_parallel*, *_radix2k_parallel*) names.
+BENCH_FILTER='BM_cantor_additive_fft.*precmp_basis|BM_lch_additive_fft.*precmp_basis'
+
+# To also add the matching IFFT tables, append:
+#   |BM_cantor_additive_ifft_precmp_basis_parallel|BM_cantor_additive_ifft_precmp_basis_radix2k_parallel|BM_lch_additive_ifft_parallel_precmp_basis|BM_lch_additive_ifft_radix2k_parallel_precmp_basis
+
+# --- Statistics ---
+# WARNING: at m=27/29 each call is very slow (work ~ m*2^m; ~18x an m=25 call,
+# so on the order of a minute-plus per call serially). 100 repetitions over the
+# big sizes is impractical. Recommended split:
+#   * sizes 9..25  with BENCH_REPETITIONS=100 (your existing high-precision run),
+#   * sizes 27..29 with a low rep count (below), then merge the JSON.
+# The settings below are a tractable single-sweep compromise.
+BENCH_REPETITIONS=100
+BENCH_MIN_WARMUP_TIME=15
+BENCH_WARMUP_ROUNDS=0

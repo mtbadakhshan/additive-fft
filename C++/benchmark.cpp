@@ -622,7 +622,43 @@ const int STEP = std::stoi(std::getenv("BM_STEP"));
 #define REGISTER_BENCH_K(fn, k) \
     BENCHMARK_TEMPLATE(fn, k)->DenseRange(MIN_RANGE, MAX_RANGE, STEP)->Unit(benchmark::kMicrosecond)->ReportAggregatesOnly(true)
 
-// Default suite for scripts/bench.sh (Cantor affine + table path + LCH).
+// =============================================================================
+// PAPER SUITE (active) — only the forward-FFT table-path (precmp-basis) families
+// behind the paper's runtime tables (see scripts/measure.conf.paper). These use
+// the *_parallel* routines swept over OMP_NUM_THREADS, where the P=1 pass is the
+// serial baseline. To restore the full suite (affine chart, IFFT, and serial
+// baselines), flip the `#if 0` block below to `#if 1`.
+// =============================================================================
+
+// Cantor table-path forward FFT — OpenMP-free serial baselines
+REGISTER_BENCH(BM_cantor_additive_fft_precmp_basis);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 2);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 3);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 4);
+
+// Cantor table-path forward FFT (radix-2 + radix-2^K, parallel)
+REGISTER_BENCH(BM_cantor_additive_fft_precmp_basis_parallel);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 2);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 3);
+REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 4);
+
+// LCH table-path forward FFT — OpenMP-free serial baselines
+REGISTER_BENCH(BM_lch_additive_fft_precmp_basis);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 2);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 3);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 4);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 5);
+
+// LCH table-path forward FFT (radix-2 + radix-2^K, parallel)
+REGISTER_BENCH(BM_lch_additive_fft_parallel_precmp_basis);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 2);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 3);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 4);
+REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 5);
+
+#if 0  // ---- Full suite (affine chart + IFFT): flip to `#if 1` to re-enable ----
+
+// Cantor affine-chart FFT
 REGISTER_BENCH(BM_cantor_additive_fft);
 REGISTER_BENCH(BM_cantor_additive_fft_parallel);
 REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k, 2);
@@ -632,6 +668,7 @@ REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k_parallel, 2);
 REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k_parallel, 3);
 REGISTER_BENCH_K(BM_cantor_additive_fft_radix2k_parallel, 4);
 
+// Cantor affine-chart IFFT
 REGISTER_BENCH(BM_cantor_additive_ifft);
 REGISTER_BENCH(BM_cantor_additive_ifft_parallel);
 REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k, 2);
@@ -641,45 +678,28 @@ REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k_parallel, 2);
 REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k_parallel, 3);
 REGISTER_BENCH_K(BM_cantor_additive_ifft_radix2k_parallel, 4);
 
-REGISTER_BENCH(BM_cantor_additive_fft_precmp_basis);
-REGISTER_BENCH(BM_cantor_additive_fft_precmp_basis_parallel);
-REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 2);
-REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 3);
-REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k, 4);
-REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 2);
-REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 3);
-REGISTER_BENCH_K(BM_cantor_additive_fft_precmp_basis_radix2k_parallel, 4);
-
-REGISTER_BENCH(BM_lch_additive_fft_precmp_basis);
-REGISTER_BENCH(BM_lch_additive_fft_parallel_precmp_basis);
-REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 2);
-REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 3);
-REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 4);
-REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_precmp_basis, 5);
-REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 2);
-REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 3);
-REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 4);
-REGISTER_BENCH_K(BM_lch_additive_fft_radix2k_parallel_precmp_basis, 5);
-
-REGISTER_BENCH(BM_cantor_additive_ifft_precmp_basis);
+// Cantor table-path inverse FFT (parallel + serial)
 REGISTER_BENCH(BM_cantor_additive_ifft_precmp_basis_parallel);
-REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 2);
-REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 3);
-REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 4);
 REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k_parallel, 2);
 REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k_parallel, 3);
 REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k_parallel, 4);
+REGISTER_BENCH(BM_cantor_additive_ifft_precmp_basis);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 2);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 3);
+REGISTER_BENCH_K(BM_cantor_additive_ifft_precmp_basis_radix2k, 4);
 
-REGISTER_BENCH(BM_lch_additive_ifft_precmp_basis);
+// LCH table-path inverse FFT (parallel + serial)
 REGISTER_BENCH(BM_lch_additive_ifft_parallel_precmp_basis);
-REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 2);
-REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 3);
-REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 4);
-REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 5);
 REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_parallel_precmp_basis, 2);
 REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_parallel_precmp_basis, 3);
 REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_parallel_precmp_basis, 4);
 REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_parallel_precmp_basis, 5);
+REGISTER_BENCH(BM_lch_additive_ifft_precmp_basis);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 2);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 3);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 4);
+REGISTER_BENCH_K(BM_lch_additive_ifft_radix2k_precmp_basis, 5);
+#endif
 
 #undef REGISTER_BENCH
 #undef REGISTER_BENCH_K
