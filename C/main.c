@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 
 #include <immintrin.h>
 
 #include "cantor/cantor_fft.h"
+#include "dyadic/dyadic_fft.h"
 #include "utils/lch_api.h"
 #include "utils/utils.h"
 #include "bitpolymul/bc.h"
@@ -54,7 +56,26 @@ void test_cantor_parallel(){
     // printf("are equal = %b\n", are_equal_vec_128bit(evals, evals3, n));
 }
 
-#define ITERATIONS 50
+void test_dyadic(){
+    for (unsigned m = 1; m <= 15; ++m){
+        unsigned n = (1ULL) << m;
+        __m128i* fx = random_polynomial_gf2128(n);
+        __m128i* evals = dyadic_fft_gf2128(fx, n);
+        __m128i* evals2 = cantor_fft_gf2128(fx, n);
+        bool ok = are_equal_vec_128bit(evals, evals2, n);
+        if (m <= 10){ // naive evaluation is quadratic; only check small sizes
+            __m128i* evals3 = naive_evaluate(fx, n);
+            ok &= are_equal_vec_128bit(evals, evals3, n);
+            free(evals3);
+        }
+        printf("m = %u, n = %u, dyadic equals naive = %b\n", m, n, ok);
+        free(fx);
+        free(evals);
+        free(evals2);
+    }
+}
+
+#define ITERATIONS 100
 void cantor_vs_lch(){
     printf("m\tCantor\t\tCantor HC\tCantor PARALLEL\tLCH\n");
     for (unsigned m = 9; m < 22; m++){
@@ -113,12 +134,66 @@ void cantor_vs_lch(){
     }
 }
 
+// Monotonic wall-clock time in milliseconds (C11 timespec_get).
+static double now_ms(void){
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+}
+
+static double mean_of(const double* x, unsigned n){
+    double s = 0;
+    for (unsigned i = 0; i < n; ++i) s += x[i];
+    return s / n;
+}
+
+// sample standard deviation (n - 1 denominator)
+static double stddev_of(const double* x, unsigned n, double mean){
+    double s = 0;
+    for (unsigned i = 0; i < n; ++i) s += (x[i] - mean) * (x[i] - mean);
+    return sqrt(s / (n - 1));
+}
+
+void lch_vs_dyadic(){
+    static double t_lch[ITERATIONS], t_dyadic[ITERATIONS];
+    printf("m\tLCH (ms)\t\t\tDyadic (ms)\n");
+    for (unsigned m = 9; m < 25; m++){
+	    unsigned n = (1ULL) << m; 
+
+        // Interleave the two algorithms inside each iteration so both see
+        // the same machine conditions (frequency scaling, thermal drift).
+        for (unsigned iter = 0; iter < ITERATIONS; ++iter){
+            __m128i* fx1 = random_polynomial_gf2128(n);
+            double t0 = now_ms();
+            __m128i* evals = lch_fft_gf2128(fx1, n);
+            t_lch[iter] = now_ms() - t0;
+            free(fx1);
+            free(evals);
+
+            __m128i* fx2 = random_polynomial_gf2128(n);
+            t0 = now_ms();
+            __m128i* evals2 = dyadic_fft_gf2128(fx2, n);
+            t_dyadic[iter] = now_ms() - t0;
+            free(fx2);
+            free(evals2);
+        }
+
+        double mean_lch = mean_of(t_lch, ITERATIONS);
+        double mean_dyadic = mean_of(t_dyadic, ITERATIONS);
+        printf("%u\t%.4f +- %.4f\t\t%.4f +- %.4f\n", m,
+               mean_lch, stddev_of(t_lch, ITERATIONS, mean_lch),
+               mean_dyadic, stddev_of(t_dyadic, ITERATIONS, mean_dyadic));
+    }
+}
+
 int main(){
     srand(time(NULL));
     // validate_cantor_basis();
-    test_bitpolymul_lch();
+    // test_bitpolymul_lch();
+    test_dyadic();
     // test_cantor();
     // cantor_vs_lch();
+    lch_vs_dyadic();
     // test_cantor_parallel();
     return 0;
 }

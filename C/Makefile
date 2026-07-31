@@ -6,6 +6,10 @@ CANTOR_DIR = cantor
 CANTOR_SRC = $(wildcard $(CANTOR_DIR)/*.c)
 CANTOR_OBJ = $(CANTOR_SRC:.c=.o)
 
+DYADIC_DIR = dyadic
+DYADIC_SRC = $(wildcard $(DYADIC_DIR)/*.c)
+DYADIC_OBJ = $(DYADIC_SRC:.c=.o)
+
 BITPOLYMUL_DIR = bitpolymul
 BITPOLYMUL_SRC = bc.c bitpolymul.c encode.c gf2128_tower_iso.c butterfly_net.c gf16.c ska.c gf2256_tower_iso.c gf2128_cantor_iso.c btfy.c trunc_btfy_tab.c
 BITPOLYMUL_OBJ = $(patsubst %.c, $(BITPOLYMUL_DIR)/%.o, $(BITPOLYMUL_SRC))
@@ -21,14 +25,18 @@ TARGET  = main.out
 all: $(TARGET)
 main.o: main.c
 	$(CC) $(CFLAGS) -c main.c -o main.o
+tune.out: tune_dyadic.c $(DYADIC_OBJ) $(BITPOLYMUL_OBJ) $(UTILS_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 $(CANTOR_DIR)/%.o: $(CANTOR_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@	
+$(DYADIC_DIR)/%.o: $(DYADIC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@	
 $(BITPOLYMUL_DIR)/%.o: $(BITPOLYMUL_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 $(UTILS_DIR)/%.o: $(UTILS_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@	
-$(TARGET): main.o $(CANTOR_OBJ) $(BITPOLYMUL_OBJ) $(UTILS_OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+$(TARGET): main.o $(CANTOR_OBJ) $(DYADIC_OBJ) $(BITPOLYMUL_OBJ) $(UTILS_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 clean:
-	rm -f main.o $(CANTOR_DIR)/*.o $(BITPOLYMUL_DIR)/*.o $(UTILS_DIR)/*.o $(TARGET)
+	rm -f main.o $(CANTOR_DIR)/*.o $(DYADIC_DIR)/*.o $(BITPOLYMUL_DIR)/*.o $(UTILS_DIR)/*.o $(TARGET)
