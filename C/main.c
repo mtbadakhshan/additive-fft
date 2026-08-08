@@ -156,8 +156,17 @@ static double stddev_of(const double* x, unsigned n, double mean){
 
 void lch_vs_dyadic(){
     static double t_lch[ITERATIONS], t_dyadic[ITERATIONS];
+
+    // Use library B (tuned via `make tune`, else L2 heuristic). Always log
+    // B and its source so paper runs are reproducible from the log + tune file.
+    dyadic_fft_set_cache_block(0);
+    printf("Dyadic cache block B = %u elements (%u KB)  [source=%s]\n",
+           dyadic_fft_get_cache_block(), dyadic_fft_get_cache_block() / 64,
+           dyadic_fft_cache_block_source());
+    printf("iterations = %u (interleaved LCH/Dyadic, mean +- sample stddev)\n",
+           (unsigned) ITERATIONS);
     printf("m\tLCH (ms)\t\t\tDyadic (ms)\n");
-    for (unsigned m = 9; m < 25; m++){
+    for (unsigned m = 9; m < 29; m++){
 	    unsigned n = (1ULL) << m; 
 
         // Interleave the two algorithms inside each iteration so both see

@@ -7,7 +7,7 @@ CANTOR_SRC = $(wildcard $(CANTOR_DIR)/*.c)
 CANTOR_OBJ = $(CANTOR_SRC:.c=.o)
 
 DYADIC_DIR = dyadic
-DYADIC_SRC = $(wildcard $(DYADIC_DIR)/*.c)
+DYADIC_SRC = $(filter-out $(DYADIC_DIR)/tune_dyadic.c,$(wildcard $(DYADIC_DIR)/*.c))
 DYADIC_OBJ = $(DYADIC_SRC:.c=.o)
 
 BITPOLYMUL_DIR = bitpolymul
@@ -20,16 +20,22 @@ UTILS_OBJ = $(UTILS_SRC:.c=.o)
 
 TARGET  = main.out
 
-.PHONY: all clean
+.PHONY: all clean tune
 
 all: $(TARGET)
 main.o: main.c
 	$(CC) $(CFLAGS) -c main.c -o main.o
-tune.out: tune_dyadic.c $(DYADIC_OBJ) $(BITPOLYMUL_OBJ) $(UTILS_OBJ)
+# Dyadic-only tuner (no LCH): needs dyadic_fft + Cantor iso table it links.
+DYADIC_TUNE_DEPS = $(DYADIC_DIR)/dyadic_fft.o $(BITPOLYMUL_DIR)/gf2128_cantor_iso.o
+tune.out: $(DYADIC_DIR)/tune_dyadic.c $(DYADIC_TUNE_DEPS)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
+# gf2x-style: measure B on this machine, write dyadic_tune_params.h, rebuild
+tune: tune.out
+	./tune.out
+	$(MAKE) $(DYADIC_DIR)/dyadic_fft.o $(TARGET)
 $(CANTOR_DIR)/%.o: $(CANTOR_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@	
-$(DYADIC_DIR)/%.o: $(DYADIC_DIR)/%.c
+$(DYADIC_DIR)/%.o: $(DYADIC_DIR)/%.c $(DYADIC_DIR)/dyadic_tune_params.h
 	$(CC) $(CFLAGS) -c $< -o $@	
 $(BITPOLYMUL_DIR)/%.o: $(BITPOLYMUL_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -39,4 +45,4 @@ $(TARGET): main.o $(CANTOR_OBJ) $(DYADIC_OBJ) $(BITPOLYMUL_OBJ) $(UTILS_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 clean:
-	rm -f main.o $(CANTOR_DIR)/*.o $(DYADIC_DIR)/*.o $(BITPOLYMUL_DIR)/*.o $(UTILS_DIR)/*.o $(TARGET)
+	rm -f main.o $(CANTOR_DIR)/*.o $(DYADIC_DIR)/*.o $(BITPOLYMUL_DIR)/*.o $(UTILS_DIR)/*.o $(TARGET) tune.out

@@ -3,10 +3,9 @@
 #include <string.h>    // Header for memcpy
 
 #if defined(__unix__) || defined(__APPLE__)
-#include <unistd.h>    // sysconf, for L2 cache detection
+#include <unistd.h>    // sysconf: L2 cache size
 #endif
 
-#include "utils/utils.h"
 #include "bitpolymul/bitmat_prod.h"
 #include "bitpolymul/gf2128_cantor_iso.h"
 #include "bitpolymul/gfext_aesni.h"
@@ -14,28 +13,25 @@
 
 #define LOG2(X) ((unsigned) (8*sizeof (unsigned long long) - __builtin_clzll((X)) - 1))
 
-// Cache chunks (in 16-byte array elements) for the blocked Taylor phase and
-// the subtree schedule. Two auto sizes are detected from the CPU caches:
+// Cache chunk B (16-byte elements) for blocked Taylor + subtree schedule.
 //
-//   L2-scale (~80% of L2): best when the working set fits in L3; a larger
-//     chunk only adds recursion overhead (Ryzen 9 9950X, m <= 21).
-//   L3-scale (~50% of L3): best when the array spills past L3 into DRAM
-//     (same machine, m >= 22 with a 16 MB chunk).
-//
-// Each FFT call picks L2-scale or L3-scale from n_term unless the user has
-// forced a value with dyadic_fft_set_cache_block(). Falls back to
-// DYADIC_DEFAULT_BLOCK when sysconf is unavailable.
-#ifndef DYADIC_DEFAULT_BLOCK
-#define DYADIC_DEFAULT_BLOCK (1u << 16)   // 2^16 x 16 B = 1 MB
+// B is a *machine parameter*, not part of the algorithm — same idea as gf2x
+// or FFTW "wisdom": the blocked schedule is fixed; B is chosen by an
+// explicit tuning phase (`make tune` -> dyadic_tune_params.h) for
+// reproducibility. Untuned fallback: round_pow2(L2/16), then 2^16.
+#include "dyadic_tune_params.h"
+
+#ifndef DYADIC_FALLBACK_BLOCK
+#define DYADIC_FALLBACK_BLOCK (1u << 16)
 #endif
 
 #define DYADIC_MIN_BLOCK (1u << 10)
 #define DYADIC_MAX_BLOCK (1u << 22)
 
-static unsigned dyadic_l2_block = 0;       // auto: ~80% of L2
-static unsigned dyadic_l3_block = 0;       // auto: ~50% of L3 (>= L2)
-static unsigned dyadic_forced_block = 0;   // non-zero: override from setter
-static unsigned dyadic_block = 0;          // active chunk for the current FFT
+static unsigned dyadic_l2_block = 0;       // 0 = not resolved yet (untuned path)
+static unsigned dyadic_forced_block = 0;   // non-zero = runtime override
+static unsigned dyadic_block = DYADIC_FALLBACK_BLOCK;
+static const char* dyadic_block_source = "fallback";
 
 static unsigned dyadic_clamp_block(unsigned long n_elem){
     if (n_elem < DYADIC_MIN_BLOCK) return DYADIC_MIN_BLOCK;
@@ -43,62 +39,52 @@ static unsigned dyadic_clamp_block(unsigned long n_elem){
     return 1u << LOG2(n_elem);      // round down to a power of two
 }
 
-static void dyadic_detect_caches(void){
-    unsigned l2 = DYADIC_DEFAULT_BLOCK;
-    unsigned l3_chunk = DYADIC_DEFAULT_BLOCK;
-
-#ifdef _SC_LEVEL2_CACHE_SIZE
-    long l2_bytes = sysconf(_SC_LEVEL2_CACHE_SIZE);
-    if (l2_bytes > 0)
-        l2 = dyadic_clamp_block(((unsigned long) l2_bytes * 4 / 5) / sizeof(__m128i));
-#endif
-#ifdef _SC_LEVEL3_CACHE_SIZE
-    long l3_bytes = sysconf(_SC_LEVEL3_CACHE_SIZE);
-    if (l3_bytes > 0){
-        // ~half of L3: measured sweet spot for DRAM-bound sizes on Zen 5
-        // (32 MB CCD L3 -> 16 MB = 2^20 elements).
-        l3_chunk = dyadic_clamp_block(((unsigned long) l3_bytes / 2) / sizeof(__m128i));
-        if (l3_chunk < l2) l3_chunk = l2;
-    } else {
-        l3_chunk = l2;
+static unsigned dyadic_configured_block(void){
+    if (dyadic_forced_block){
+        dyadic_block_source = "forced";
+        return dyadic_forced_block;
     }
+#ifdef DYADIC_TUNED_BLOCK
+    dyadic_block_source = "tuned";
+    return dyadic_clamp_block(DYADIC_TUNED_BLOCK);
 #else
-    l3_chunk = l2;
+    if (!dyadic_l2_block){
+#ifdef _SC_LEVEL2_CACHE_SIZE
+        long l2_bytes = sysconf(_SC_LEVEL2_CACHE_SIZE);
+        if (l2_bytes > 0){
+            dyadic_l2_block = dyadic_clamp_block((unsigned long) l2_bytes / sizeof(__m128i));
+            dyadic_block_source = "L2";
+            return dyadic_l2_block;
+        }
 #endif
-
-    dyadic_l2_block = l2;
-    dyadic_l3_block = l3_chunk;
-}
-
-static unsigned dyadic_block_for(unsigned n_term){
-    if (dyadic_forced_block) return dyadic_forced_block;
-    if (!dyadic_l2_block) dyadic_detect_caches();
-    // Once the array exceeds the L3-scale chunk, prefer that larger chunk
-    // (DRAM-bound regime). Smaller sizes stay on the L2-scale chunk.
-    // Threshold = chunk size (not full L3) so the crossover is right whether
-    // sysconf reports one CCD's L3 or the summed L3.
-    if (n_term > dyadic_l3_block && dyadic_l3_block > dyadic_l2_block)
-        return dyadic_l3_block;
+        dyadic_l2_block = DYADIC_FALLBACK_BLOCK;
+        dyadic_block_source = "fallback";
+    }
     return dyadic_l2_block;
+#endif
 }
 
 void dyadic_fft_set_cache_block(unsigned n_elem){
     if (n_elem == 0){
         dyadic_forced_block = 0;
-        dyadic_l2_block = 0;   // force re-detection on next use
+        dyadic_l2_block = 0;
         return;
     }
     dyadic_forced_block = dyadic_clamp_block(n_elem);
 }
 
 unsigned dyadic_fft_get_cache_block(void){
-    if (dyadic_forced_block) return dyadic_forced_block;
-    if (!dyadic_l2_block) dyadic_detect_caches();
-    return dyadic_l2_block;    // L2-scale default; large FFTs may use L3-scale
+    return dyadic_configured_block();
 }
 
 unsigned dyadic_fft_cache_block_for(unsigned n_term){
-    return dyadic_block_for(n_term);
+    (void) n_term;
+    return dyadic_configured_block();
+}
+
+const char* dyadic_fft_cache_block_source(void){
+    (void) dyadic_configured_block();
+    return dyadic_block_source;
 }
 
 // One halving pass: poly[p - shift] ^= poly[p] for p descending over the
@@ -278,10 +264,10 @@ static void dyadic_butterfly_2x2(__m128i* poly, unsigned base, unsigned region, 
 //
 // Cache blocking across the whole subtree: every operation of Sched(mu, s)
 // stays inside span-aligned blocks of size span = 2^(s+mu), so blocks are
-// fully independent. Once span fits in the active cache chunk (L2- or
-// L3-scale, chosen from n_term), the entire remaining subtree is executed
-// chunk by chunk while the chunk is hot - one trip through DRAM instead of
-// one per phase. Only phases whose span exceeds the chunk remain full sweeps.
+// fully independent. Once span fits in the configured chunk B, the entire
+// remaining subtree is executed chunk by chunk while the chunk is hot -
+// one trip through DRAM instead of one per phase. Only phases whose span
+// exceeds B remain full sweeps.
 static void dyadic_sched(__m128i* poly, unsigned base, unsigned region, unsigned mu, unsigned s){
     unsigned span = (1u << s) << mu;
     if (region > dyadic_block && span <= dyadic_block){
@@ -315,7 +301,7 @@ __m128i* dyadic_fft_gf2128(__m128i* fx, unsigned n_term){
     #endif
     unsigned m = LOG2(n_term);
 
-    dyadic_block = dyadic_block_for(n_term);
+    dyadic_block = dyadic_configured_block();
     dyadic_sched(poly, 0, n_term, m, 0);
 
     return poly;
@@ -336,7 +322,7 @@ __m128i* dyadic_fft_gf2128_iter(__m128i* fx, unsigned n_term){
     #endif
     unsigned m = LOG2(n_term);
 
-    dyadic_block = dyadic_block_for(n_term);
+    dyadic_block = dyadic_configured_block();
     unsigned stack_mu[32], stack_s[32];
     unsigned top = 0;
     stack_mu[top] = m; stack_s[top] = 0; top++;
