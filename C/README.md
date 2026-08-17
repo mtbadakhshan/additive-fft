@@ -1,22 +1,46 @@
-| m       | Cantor          |LCH        |
-|:-------:|:---------------:|:---------:|
-| 3       | 0.000500ms      |0.000800ms |
-| 4       | 0.000900ms      |0.000700ms |
-| 5       | 0.001200ms      |0.001000ms |
-| 6       | 0.001800ms      |0.001500ms |
-| 7       | 0.003300ms      |0.003600ms |
-| 8       | 0.007200ms      |0.007600ms |
-| 9       | 0.016100ms      |0.015800ms |
-| 10      | 0.034400ms      |0.032600ms |
-| 11      | 0.062200ms      |0.057400ms |
-| 12      | 0.107400ms      |0.096200ms |
-| 13      | 0.234700ms      |0.209500ms |
-| 14      | 0.523300ms      |0.445800ms |
-| 15      | 1.067400ms      |0.882800ms |
-| 16      | 2.414900ms      |1.952100ms |
-| 17      | 5.080100ms      |4.031400ms |
-| 18      | 10.486100ms     |8.249500ms |
-| 19      | 22.779500ms     |18.011800ms|
-| 20      | 53.477600ms     |42.258000ms|
-| 21      | 118.730300ms    |96.308400ms|
+# Benchmarking
+
+The benchmark driver is implemented in `main.c`, which can be modified to select the FFT algorithms and parameter sizes to benchmark.
+
+The **Dyadic AFFT** includes an optional tuning step that determines suitable implementation parameters for the target machine. The following instructions benchmark the Dyadic AFFT against the LCH AFFT implementation provided by [`bitpolymul`](https://github.com/fast-crypto-lab/bitpolymul).
+
+### 1. Initialize dependencies
+
+From the repository root, initialize `bitpolymul` and the other Git submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### 2. Enter the C implementation directory
+
+```bash
+cd C
+```
+
+### 3. Tune the Dyadic AFFT (optional)
+
+The tuning step can be run once for the target machine. To reduce scheduling variability, the process can be pinned to a single CPU core:
+
+```bash
+taskset -c 0 make tune
+```
+
+The resulting tuning parameters are then used by the Dyadic AFFT implementation during benchmarking.
+
+### 4. Build and run the benchmark
+
+Compile the benchmark:
+
+```bash
+make
+```
+
+Then run it on the same CPU core:
+
+```bash
+taskset -c 0 ./main.out
+```
+
+Using `taskset` is optional, but pinning both tuning and benchmarking to the same CPU core helps reduce run-to-run variability and makes the measurements more reproducible.
 
